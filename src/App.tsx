@@ -70,6 +70,21 @@ export default function App() {
     };
 
     fetchNewsFromApi();
+
+    // Auto-refresh from PostgreSQL DB every 20 seconds to stay synced globally
+    const interval = setInterval(() => {
+      fetchNewsFromApi();
+    }, 20000);
+
+    const handleFocus = () => {
+      fetchNewsFromApi();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Sync newsList with local cache on change
@@ -105,14 +120,8 @@ export default function App() {
     }
   };
 
-  // Update News List from Admin Panel
-  const handleUpdateNewsList = (updated: NewsItem[]) => {
-    const sorted = sortNewsByPosition(updated);
-    setNewsList(sorted);
-  };
-
-  // Save directly to code file via API (/api/news)
-  const handleSaveToCodeDirectly = async (): Promise<boolean> => {
+  // Helper to persist news list to PostgreSQL DB automatically
+  const persistToDatabase = async (itemsToSave: NewsItem[]): Promise<boolean> => {
     setIsSavingToCode(true);
     setLastSaveSuccess(null);
 
@@ -120,7 +129,7 @@ export default function App() {
       const data = await safeFetchJson('/api/news', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ news: newsList }),
+        body: JSON.stringify({ news: itemsToSave }),
       });
 
       if (data && data.success) {
@@ -131,7 +140,7 @@ export default function App() {
         throw new Error(data?.error || 'No se pudo guardar en la base de datos.');
       }
     } catch (err) {
-      console.error('Error saving directly to code:', err);
+      console.error('Error auto-saving to database:', err);
       setLastSaveSuccess(false);
       setTimeout(() => setLastSaveSuccess(null), 4000);
       return false;
@@ -140,7 +149,19 @@ export default function App() {
     }
   };
 
-  // Add Comment to Article
+  // Update News List from Admin Panel and sync to Database automatically
+  const handleUpdateNewsList = (updated: NewsItem[]) => {
+    const sorted = sortNewsByPosition(updated);
+    setNewsList(sorted);
+    persistToDatabase(sorted);
+  };
+
+  // Save directly to code file via API (/api/news)
+  const handleSaveToCodeDirectly = async (): Promise<boolean> => {
+    return await persistToDatabase(newsList);
+  };
+
+  // Add Comment to Article and sync to Database
   const handleAddComment = (newsId: string, commentText: string, authorName: string) => {
     const updated = newsList.map((item) => {
       if (item.id === newsId) {
@@ -160,14 +181,16 @@ export default function App() {
       return item;
     });
 
-    setNewsList(updated);
+    const sorted = sortNewsByPosition(updated);
+    setNewsList(sorted);
     if (selectedNews && selectedNews.id === newsId) {
-      const updatedSelected = updated.find((n) => n.id === newsId) || null;
+      const updatedSelected = sorted.find((n) => n.id === newsId) || null;
       setSelectedNews(updatedSelected);
     }
+    persistToDatabase(sorted);
   };
 
-  // Like Article
+  // Like Article and sync to Database
   const handleLikeNews = (newsId: string) => {
     const updated = newsList.map((item) => {
       if (item.id === newsId) {
@@ -178,11 +201,14 @@ export default function App() {
       }
       return item;
     });
-    setNewsList(updated);
+
+    const sorted = sortNewsByPosition(updated);
+    setNewsList(sorted);
     if (selectedNews && selectedNews.id === newsId) {
-      const updatedSelected = updated.find((n) => n.id === newsId) || null;
+      const updatedSelected = sorted.find((n) => n.id === newsId) || null;
       setSelectedNews(updatedSelected);
     }
+    persistToDatabase(sorted);
   };
 
   // Filtered News Items Calculation

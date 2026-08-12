@@ -505,12 +505,12 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
         </div>
 
 
-        {/* Global Save to Code Direct Action Banner */}
-        <div className="bg-amber-300 text-black px-6 py-3 border-b-4 border-black flex flex-wrap items-center justify-between gap-3 text-xs font-bold uppercase tracking-wider">
+        {/* Global Auto-Sync & Manual Save Banner */}
+        <div className="bg-emerald-400 text-black px-6 py-3 border-b-4 border-black flex flex-wrap items-center justify-between gap-3 text-xs font-bold uppercase tracking-wider">
           <div className="flex items-center gap-2">
-            <Code className="w-4 h-4 text-black" />
+            <Database className="w-4 h-4 text-black shrink-0" />
             <span>
-              <strong>Guardado en Código:</strong> Las noticias modificadas se guardan en <code className="bg-black text-white px-1.5 py-0.5 font-mono">src/data/news.json</code>.
+              <strong>Sincronización Global en Tiempo Real:</strong> Todos los cambios (agregar, editar, eliminar o reordenar) se guardan automáticamente en la Base de Datos PostgreSQL (Neon) para que se actualicen en todo el mundo.
             </span>
           </div>
 
@@ -519,12 +519,12 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
             disabled={isSavingToCode}
             className={`flex items-center gap-2 px-4 py-1.5 border-2 border-black font-black text-xs uppercase tracking-widest transition ${
               lastSaveSuccess === true 
-                ? 'bg-emerald-500 text-black' 
-                : 'bg-black text-white hover:bg-rose-600'
+                ? 'bg-black text-emerald-400' 
+                : 'bg-black text-white hover:bg-slate-800'
             }`}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isSavingToCode ? 'animate-spin' : ''}`} />
-            {isSavingToCode ? 'Escribiendo archivo news.json...' : 'Guardar Todo en Código'}
+            {isSavingToCode ? 'Sincronizando DB...' : 'Forzar Sincronización DB'}
           </button>
         </div>
 
