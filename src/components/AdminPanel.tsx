@@ -4,6 +4,7 @@ import {
   CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldCheck, Flame, Image as ImageIcon, Zap, Link as LinkIcon, Globe, ExternalLink, Database, Activity
 } from 'lucide-react';
 import { NewsItem, Category } from '../types';
+import { safeFetchJson } from '../utils/apiHelper';
 
 interface AdminPanelProps {
   newsList: NewsItem[];
@@ -69,9 +70,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const fetchDbHealth = async () => {
     setIsCheckingDb(true);
     try {
-      const res = await fetch('/api/db-health');
-      const data = await res.json();
-      if (data.success && data.health) {
+      const data = await safeFetchJson('/api/db-health');
+      if (data && data.success && data.health) {
         setDbHealth(data.health);
       } else {
         setDbHealth({
@@ -80,7 +80,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           host: 'Neon PostgreSQL',
           latencyMs: 0,
           totalNews: newsList.length,
-          error: data.health?.error || 'Error al conectar'
+          error: data?.health?.error || 'Error al conectar'
         });
       }
     } catch (err: any) {
@@ -294,15 +294,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setImportedPreviewItem(null);
 
     try {
-      const res = await fetch('/api/import-from-url', {
+      const data = await safeFetchJson('/api/import-from-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: urlInput.trim() }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'No se pudo extraer la información del enlace proporcionado.');
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'No se pudo extraer la información del enlace proporcionado.');
       }
 
       const itemData = data.item || data.data || {};
@@ -356,15 +355,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setAiError(null);
 
     try {
-      const res = await fetch('/api/generate-news', {
+      const data = await safeFetchJson('/api/generate-news', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: aiPrompt, category: aiCategory }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Error al comunicarse con la IA Gemini');
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Error al comunicarse con la IA Gemini');
       }
 
       const generated = data.data;

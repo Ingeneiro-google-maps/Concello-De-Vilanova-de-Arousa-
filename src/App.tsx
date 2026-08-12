@@ -9,6 +9,7 @@ import { AdminAuthModal } from './components/AdminAuthModal';
 import { Footer } from './components/Footer';
 import { NewsItem, Category } from './types';
 import { initialNewsData } from './data/newsData';
+import { safeFetchJson } from './utils/apiHelper';
 
 export default function App() {
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
@@ -41,13 +42,10 @@ export default function App() {
     // Load news from API or local cache
     const fetchNewsFromApi = async () => {
       try {
-        const res = await fetch('/api/news');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.news) && data.news.length > 0) {
-            setNewsList(sortNewsByPosition(data.news));
-            return;
-          }
+        const data = await safeFetchJson('/api/news');
+        if (data && data.success && Array.isArray(data.news) && data.news.length > 0) {
+          setNewsList(sortNewsByPosition(data.news));
+          return;
         }
       } catch (err) {
         console.warn('Backend API unavailable, attempting local storage or fallback:', err);
@@ -119,19 +117,18 @@ export default function App() {
     setLastSaveSuccess(null);
 
     try {
-      const res = await fetch('/api/news', {
+      const data = await safeFetchJson('/api/news', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ news: newsList }),
       });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      if (data && data.success) {
         setLastSaveSuccess(true);
         setTimeout(() => setLastSaveSuccess(null), 4000);
         return true;
       } else {
-        throw new Error(data.error || 'No se pudo guardar en el archivo de código.');
+        throw new Error(data?.error || 'No se pudo guardar en la base de datos.');
       }
     } catch (err) {
       console.error('Error saving directly to code:', err);
