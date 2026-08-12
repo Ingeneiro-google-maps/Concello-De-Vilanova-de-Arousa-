@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, Plus, ArrowUp, ArrowDown, Edit3, Trash2, Sparkles, Save, Code, Download, 
-  CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldCheck, Flame, Image as ImageIcon, Zap, Link as LinkIcon, Globe, ExternalLink
+  CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldCheck, Flame, Image as ImageIcon, Zap, Link as LinkIcon, Globe, ExternalLink, Database, Activity
 } from 'lucide-react';
 import { NewsItem, Category } from '../types';
 
@@ -53,6 +53,54 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Code Export State
   const [copiedCode, setCopiedCode] = useState(false);
+
+  // Database Health Connection State
+  const [dbHealth, setDbHealth] = useState<{
+    connected: boolean;
+    dbName: string;
+    host: string;
+    latencyMs: number;
+    totalNews: number;
+    error?: string;
+    serverTime?: string;
+  } | null>(null);
+  const [isCheckingDb, setIsCheckingDb] = useState(false);
+
+  const fetchDbHealth = async () => {
+    setIsCheckingDb(true);
+    try {
+      const res = await fetch('/api/db-health');
+      const data = await res.json();
+      if (data.success && data.health) {
+        setDbHealth(data.health);
+      } else {
+        setDbHealth({
+          connected: false,
+          dbName: 'neondb',
+          host: 'Neon PostgreSQL',
+          latencyMs: 0,
+          totalNews: newsList.length,
+          error: data.health?.error || 'Error al conectar'
+        });
+      }
+    } catch (err: any) {
+      setDbHealth({
+        connected: false,
+        dbName: 'neondb',
+        host: 'Neon PostgreSQL',
+        latencyMs: 0,
+        totalNews: newsList.length,
+        error: err.message || 'Error de conexión'
+      });
+    } finally {
+      setIsCheckingDb(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDbHealth();
+  }, []);
+
 
   // Load item into edit form
   const handleStartEdit = (item: NewsItem) => {
@@ -385,7 +433,7 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                 Panel de Administración de Noticias
               </h2>
               <p className="text-xs font-mono text-slate-300 uppercase tracking-wider">
-                Gestiona, reordena posiciones y guarda el contenido en el código
+                Concello de Vilanova de Arousa • Gestión de Contenidos
               </p>
             </div>
           </div>
@@ -398,6 +446,64 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
             <X className="w-6 h-6" />
           </button>
         </div>
+
+        {/* DB Connection & Health Indicator Banner */}
+        <div className={`px-6 py-2.5 border-b-4 border-black flex flex-wrap items-center justify-between gap-3 text-xs font-mono font-bold transition-colors ${
+          dbHealth?.connected 
+            ? 'bg-slate-900 text-emerald-400 border-emerald-800' 
+            : 'bg-rose-950 text-rose-200 border-rose-800'
+        }`}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-3 w-3">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${dbHealth?.connected ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
+                <span className={`relative inline-flex rounded-full h-3 w-3 ${dbHealth?.connected ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+              </span>
+              <span className="font-sans font-black uppercase text-xs tracking-wider text-white">
+                Base de Datos: {dbHealth?.connected ? 'CONECTADA (OK)' : 'DESCONECTADA / ERROR'}
+              </span>
+            </div>
+
+            {dbHealth?.connected && (
+              <>
+                <span className="opacity-40">|</span>
+                <span className="flex items-center gap-1.5">
+                  <Database className="w-3.5 h-3.5 text-emerald-400" />
+                  DB: <strong className="text-white font-mono">{dbHealth.dbName}</strong>
+                </span>
+                <span className="opacity-40">|</span>
+                <span className="truncate max-w-[200px] sm:max-w-none">
+                  Host: <strong className="text-emerald-300 font-mono">{dbHealth.host}</strong>
+                </span>
+                <span className="opacity-40">|</span>
+                <span className="flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-amber-400" />
+                  Latencia: <strong className="text-amber-300 font-mono">{dbHealth.latencyMs}ms</strong>
+                </span>
+                <span className="opacity-40">|</span>
+                <span>
+                  Registros: <strong className="text-white font-mono">{dbHealth.totalNews} noticias</strong>
+                </span>
+              </>
+            )}
+
+            {!dbHealth?.connected && dbHealth?.error && (
+              <span className="text-rose-300 font-sans text-xs">Detalle: {dbHealth.error}</span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={fetchDbHealth}
+            disabled={isCheckingDb}
+            className="bg-black/60 hover:bg-black text-white px-2.5 py-1 border border-white/30 text-[11px] font-mono flex items-center gap-1.5 transition rounded shrink-0"
+            title="Verificar conexión de la base de datos ahora"
+          >
+            <RefreshCw className={`w-3 h-3 ${isCheckingDb ? 'animate-spin text-emerald-400' : ''}`} />
+            <span>{isCheckingDb ? 'Probando...' : 'Probar Conexión DB'}</span>
+          </button>
+        </div>
+
 
         {/* Global Save to Code Direct Action Banner */}
         <div className="bg-amber-300 text-black px-6 py-3 border-b-4 border-black flex flex-wrap items-center justify-between gap-3 text-xs font-bold uppercase tracking-wider">

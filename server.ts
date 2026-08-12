@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { initDb, getAllNewsFromDb, saveAllNewsToDb, checkDbHealth } from './src/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,18 +17,25 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
 
-  // Helper to read news from JSON file
+  // Initialize PostgreSQL Database table
+  try {
+    await initDb();
+  } catch (dbErr) {
+    console.error('Failed to initialize database:', dbErr);
+  }
+
+  // Helper to read news from JSON file fallback
   async function readNewsFromFile() {
     try {
       const data = await fs.readFile(NEWS_FILE_PATH, 'utf-8');
       return JSON.parse(data);
     } catch (error) {
-      console.warn('Could not read news.json, returning empty array or fallback:', error);
+      console.warn('Could not read news.json, returning empty array:', error);
       return [];
     }
   }
 
-  // Helper to write news to JSON file
+  // Helper to write news to JSON file fallback
   async function writeNewsToFile(newsArray: any[]) {
     try {
       await fs.mkdir(path.dirname(NEWS_FILE_PATH), { recursive: true });
@@ -40,31 +48,56 @@ async function startServer() {
   }
 
   // API Endpoints
-  // 1. Get all news
+  // 1. Get all news from PostgreSQL DB
   app.get('/api/news', async (req, res) => {
     try {
-      const news = await readNewsFromFile();
+      const news = await getAllNewsFromDb();
       res.json({ success: true, news });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      console.warn('PostgreSQL fetch error, reading fallback news.json:', err.message);
+      const news = await readNewsFromFile();
+      res.json({ success: true, news });
     }
   });
 
-  // 2. Save news directly to news.json code file
+  // 2. Save news directly to PostgreSQL DB
   app.post('/api/news', async (req, res) => {
     try {
       const { news } = req.body;
       if (!Array.isArray(news)) {
         return res.status(400).json({ success: false, error: 'Se requiere un arreglo de noticias.' });
       }
-      await writeNewsToFile(news);
-      res.json({ success: true, message: 'Noticias guardadas directamente en el código (src/data/news.json).' });
+      await saveAllNewsToDb(news);
+      res.json({ success: true, message: 'Noticias guardadas exitosamente en la base de datos PostgreSQL (Neon).' });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      console.error('Error saving news to DB:', err);
+      // Fallback write to file
+      try {
+        await writeNewsToFile(req.body.news);
+        res.json({ success: true, message: 'Noticias guardadas localmente en archivo.' });
+      } catch (fErr: any) {
+        res.status(500).json({ success: false, error: err.message });
+      }
     }
   });
 
-  // 3. AI News Generator using Gemini API
+
+  // 2b. Check PostgreSQL database connection health & latency
+  app.get('/api/db-health', async (req, res) => {
+    try {
+      const health = await checkDbHealth();
+      res.json({ success: true, health });
+    } catch (err: any) {
+      res.status(500).json({
+        success: false,
+        health: {
+          connected: false,
+          error: err.message || 'Error al conectar con la base de datos'
+        }
+      });
+    }
+  });
+
   app.post('/api/generate-news', async (req, res) => {
     try {
       const { prompt, category } = req.body;
