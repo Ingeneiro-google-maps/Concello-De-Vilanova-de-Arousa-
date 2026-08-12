@@ -253,19 +253,22 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con los siguientes campos:
             ? fetchedImage
             : `https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80`;
 
+          const resultItem = {
+            ...geminiData,
+            imageUrl: finalImage,
+            originalUrl: url,
+            date: new Date().toISOString(),
+            views: 100,
+            likes: 12,
+            isBreaking: false,
+            isHero: false,
+            comments: []
+          };
+
           return res.json({
             success: true,
-            data: {
-              ...geminiData,
-              imageUrl: finalImage,
-              originalUrl: url,
-              date: new Date().toISOString(),
-              views: 100,
-              likes: 12,
-              isBreaking: false,
-              isHero: false,
-              comments: []
-            }
+            data: resultItem,
+            item: resultItem
           });
         } catch (geminiError) {
           console.warn('Gemini URL analysis fallback:', geminiError);
@@ -278,26 +281,29 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con los siguientes campos:
       const finalTitle = fetchedTitle || `Noticia publicada en ${domainName}`;
       const finalSubtitle = fetchedDescription || `Accede a la cobertura completa directamente en el sitio original de ${domainName}.`;
 
+      const fallbackItem = {
+        title: finalTitle,
+        subtitle: finalSubtitle,
+        content: `${finalSubtitle}\n\nEste artículo es una vista previa de la información alojada originalmente en ${domainName}. Haz clic en "Ir a la noticia original" para leer la publicación completa en la fuente oficial.`,
+        category: 'Todas',
+        imageUrl: fetchedImage || `https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80`,
+        originalUrl: url,
+        author: fetchedSiteName || domainName,
+        authorRole: 'Fuente Original',
+        date: new Date().toISOString(),
+        readTime: '2 min de lectura',
+        views: 50,
+        likes: 5,
+        tags: [domainName, 'Noticias'],
+        isBreaking: false,
+        isHero: false,
+        comments: []
+      };
+
       res.json({
         success: true,
-        data: {
-          title: finalTitle,
-          subtitle: finalSubtitle,
-          content: `${finalSubtitle}\n\nEste artículo es una vista previa de la información alojada originalmente en ${domainName}. Haz clic en "Ir a la noticia original" para leer la publicación completa en la fuente oficial.`,
-          category: 'Nacional',
-          imageUrl: fetchedImage || `https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80`,
-          originalUrl: url,
-          author: fetchedSiteName || domainName,
-          authorRole: 'Fuente Original',
-          date: new Date().toISOString(),
-          readTime: '2 min de lectura',
-          views: 50,
-          likes: 5,
-          tags: [domainName, 'Noticias'],
-          isBreaking: false,
-          isHero: false,
-          comments: []
-        }
+        data: fallbackItem,
+        item: fallbackItem
       });
     } catch (err: any) {
       console.error('Error importing news from URL:', err);

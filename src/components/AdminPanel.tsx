@@ -305,24 +305,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         throw new Error(data.error || 'No se pudo extraer la información del enlace proporcionado.');
       }
 
+      const itemData = data.item || data.data || {};
+
       const imported: NewsItem = {
         id: `imported-${Date.now()}`,
-        title: data.item.title || 'Noticia Importada',
-        subtitle: data.item.subtitle || '',
-        content: data.item.content || '',
-        category: (data.item.category as Category) || 'Todas',
-        imageUrl: data.item.imageUrl || 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=1200&q=80',
-        author: data.item.author || 'Fuente Externa',
-        authorRole: 'Medio Periodístico',
+        title: itemData.title || 'Noticia Importada',
+        subtitle: itemData.subtitle || '',
+        content: itemData.content || '',
+        category: (itemData.category as Category) || 'Todas',
+        imageUrl: itemData.imageUrl || 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=1200&q=80',
+        author: itemData.author || 'Fuente Externa',
+        authorRole: itemData.authorRole || 'Medio Periodístico',
         date: new Date().toISOString(),
-        readTime: data.item.readTime || '3 min de lectura',
+        readTime: itemData.readTime || '3 min de lectura',
         isBreaking: false,
         isHero: false,
         position: 1,
         views: 120,
         likes: 12,
-        originalUrl: urlInput.trim(),
-        tags: data.item.tags || ['NoticiaLink', 'Agregador'],
+        originalUrl: itemData.originalUrl || urlInput.trim(),
+        tags: Array.isArray(itemData.tags) ? itemData.tags : ['NoticiaLink', 'Agregador'],
         comments: [],
       };
 
