@@ -45,6 +45,18 @@ export interface SiteConfig {
   showVideo: boolean; // Whether video is visible on main page
   videoPosition: 'top' | 'middle' | 'sidebar'; // Position on page
   autoplayVideo?: boolean; // Autoplay video on page load
+
+  // Google SEO & CEO Positioning Suite
+  seoTitle?: string;
+  seoMetaDescription?: string;
+  seoKeywords?: string;
+  googleSearchConsoleTag?: string;
+  googleAnalyticsId?: string;
+  ogImageUrl?: string;
+  canonicalUrl?: string;
+  robotsMeta?: string;
+  structuredDataOrgName?: string;
+  structuredDataRegion?: string;
 }
 
 export const defaultSiteConfig: SiteConfig = {
@@ -59,5 +71,17 @@ export const defaultSiteConfig: SiteConfig = {
   showVideo: true,
   videoPosition: 'top',
   autoplayVideo: true,
+
+  // Default SEO Settings optimized for Google search index
+  seoTitle: 'Concello de Vilanova de Arousa - Portal Oficial Noticias y Actualidad',
+  seoMetaDescription: 'Portal Informativo Oficial del Concello de Vilanova de Arousa. Últimas noticias de alcaldía, obradoiros, proyectos municipales, bandos y eventos.',
+  seoKeywords: 'Vilanova de Arousa, Concello, Galicia, Alcaldia, Noticias Vilanova, Salnes, Pontevedra, Obras Municipales, Agenda Vilanova',
+  googleSearchConsoleTag: 'google-site-verification-vilanova-official-2026',
+  googleAnalyticsId: 'G-VILANOVA2026',
+  ogImageUrl: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?auto=format&fit=crop&w=1200&q=80',
+  canonicalUrl: 'https://vilanova-de-arousa.gal',
+  robotsMeta: 'index, follow, max-image-preview:large, max-snippet:-1',
+  structuredDataOrgName: 'Concello de Vilanova de Arousa',
+  structuredDataRegion: 'Galicia, España',
 };
 

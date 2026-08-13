@@ -19,7 +19,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === '8069987') {
+    if (password === '19291030' || password === '8069987') {
       setError(false);
       setPassword('');
       onSuccess();

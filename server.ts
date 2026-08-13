@@ -108,6 +108,88 @@ async function startServer() {
     }
   });
 
+  // Dynamic Sitemap.xml route for Google Search Console indexing
+  app.get('/sitemap.xml', async (req, res) => {
+    try {
+      let news: any[] = [];
+      try {
+        news = await getAllNewsFromDb();
+      } catch (e) {
+        news = await readNewsFromFile();
+      }
+
+      let siteConfig: any = {};
+      try {
+        siteConfig = await getSiteConfigFromDb();
+      } catch (e) {}
+
+      const baseUrl = (siteConfig && siteConfig.canonicalUrl) ? siteConfig.canonicalUrl : 'https://vilanova-de-arousa.gal';
+      const escapeXml = (str: string) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+
+      const todayIso = new Date().toISOString().split('T')[0];
+
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n`;
+
+      // Home URL
+      xml += `  <url>\n`;
+      xml += `    <loc>${escapeXml(baseUrl)}/</loc>\n`;
+      xml += `    <lastmod>${todayIso}</lastmod>\n`;
+      xml += `    <changefreq>daily</changefreq>\n`;
+      xml += `    <priority>1.0</priority>\n`;
+      xml += `    <mobile:mobile/>\n`;
+      xml += `  </url>\n`;
+
+      // Categories
+      const categories = ['Alcaldia', 'Obras', 'Deportes', 'Cultura', 'Turismo', 'Servizos', 'Eventos'];
+      categories.forEach(cat => {
+        xml += `  <url>\n`;
+        xml += `    <loc>${escapeXml(baseUrl)}/#categoria-${cat.toLowerCase()}</loc>\n`;
+        xml += `    <lastmod>${todayIso}</lastmod>\n`;
+        xml += `    <changefreq>daily</changefreq>\n`;
+        xml += `    <priority>0.9</priority>\n`;
+        xml += `  </url>\n`;
+      });
+
+      // News Items
+      news.forEach((item: any) => {
+        const itemDate = item.date ? item.date.split('T')[0] : todayIso;
+        xml += `  <url>\n`;
+        xml += `    <loc>${escapeXml(baseUrl)}/#noticia-${escapeXml(item.id)}</loc>\n`;
+        xml += `    <lastmod>${itemDate}</lastmod>\n`;
+        xml += `    <changefreq>weekly</changefreq>\n`;
+        xml += `    <priority>0.8</priority>\n`;
+
+        // Google News Tag
+        xml += `    <news:news>\n`;
+        xml += `      <news:publication>\n`;
+        xml += `        <news:name>${escapeXml(siteConfig?.structuredDataOrgName || 'Concello de Vilanova de Arousa')}</news:name>\n`;
+        xml += `        <news:language>es</news:language>\n`;
+        xml += `      </news:publication>\n`;
+        xml += `      <news:publication_date>${itemDate}</news:publication_date>\n`;
+        xml += `      <news:title>${escapeXml(item.title)}</news:title>\n`;
+        xml += `    </news:news>\n`;
+
+        // Image Tag
+        if (item.imageUrl) {
+          xml += `    <image:image>\n`;
+          xml += `      <image:loc>${escapeXml(item.imageUrl)}</image:loc>\n`;
+          xml += `      <image:title>${escapeXml(item.title)}</image:title>\n`;
+          xml += `    </image:image>\n`;
+        }
+
+        xml += `  </url>\n`;
+      });
+
+      xml += `</urlset>`;
+
+      res.header('Content-Type', 'application/xml');
+      res.status(200).send(xml);
+    } catch (err: any) {
+      res.status(500).send('Error generating sitemap');
+    }
+  });
+
   app.post('/api/config', async (req, res) => {
     try {
       const { config } = req.body;

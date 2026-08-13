@@ -59,6 +59,69 @@ export default function App() {
     return false;
   };
 
+  // Dynamic SEO & Google Positioning Head Management
+  useEffect(() => {
+    if (!siteConfig) return;
+
+    // Title
+    const titleToSet = siteConfig.seoTitle || siteConfig.titleText || 'Concello de Vilanova de Arousa';
+    document.title = titleToSet;
+
+    const setMeta = (attrName: string, attrVal: string, contentVal: string) => {
+      if (!contentVal) return;
+      let el = document.querySelector(`meta[${attrName}="${attrVal}"]`);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attrName, attrVal);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', contentVal);
+    };
+
+    setMeta('name', 'description', siteConfig.seoMetaDescription || '');
+    setMeta('name', 'keywords', siteConfig.seoKeywords || '');
+    setMeta('name', 'robots', siteConfig.robotsMeta || 'index, follow');
+    setMeta('name', 'google-site-verification', siteConfig.googleSearchConsoleTag || '');
+
+    setMeta('property', 'og:title', titleToSet);
+    setMeta('property', 'og:description', siteConfig.seoMetaDescription || '');
+    setMeta('property', 'og:image', siteConfig.ogImageUrl || '');
+    setMeta('property', 'og:type', 'website');
+
+    if (siteConfig.canonicalUrl) {
+      let canonicalEl = document.querySelector('link[rel="canonical"]');
+      if (!canonicalEl) {
+        canonicalEl = document.createElement('link');
+        canonicalEl.setAttribute('rel', 'canonical');
+        document.head.appendChild(canonicalEl);
+      }
+      canonicalEl.setAttribute('href', siteConfig.canonicalUrl);
+    }
+
+    // JSON-LD Schema.org Structured Data
+    let schemaEl = document.getElementById('json-ld-schema-script');
+    if (!schemaEl) {
+      schemaEl = document.createElement('script');
+      schemaEl.id = 'json-ld-schema-script';
+      schemaEl.setAttribute('type', 'application/ld+json');
+      document.head.appendChild(schemaEl);
+    }
+    schemaEl.textContent = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "GovernmentOrganization",
+      "name": siteConfig.structuredDataOrgName || "Concello de Vilanova de Arousa",
+      "url": siteConfig.canonicalUrl || "https://vilanova-de-arousa.gal",
+      "logo": siteConfig.logoUrl || "https://vilanova-de-arousa.gal/logo.png",
+      "description": siteConfig.seoMetaDescription,
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Vilanova de Arousa",
+        "addressRegion": siteConfig.structuredDataRegion || "Galicia, España",
+        "addressCountry": "ES"
+      }
+    });
+  }, [siteConfig]);
+
   // Initial Load
   useEffect(() => {
     // Load saved bookmarks from localStorage
