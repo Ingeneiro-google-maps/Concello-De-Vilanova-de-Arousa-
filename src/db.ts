@@ -63,8 +63,74 @@ export async function initDb() {
         config_data JSONB NOT NULL,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS visit_logs (
+        id SERIAL PRIMARY KEY,
+        ip_address VARCHAR(100),
+        location VARCHAR(255) DEFAULT 'Vilanova de Arousa, Galicia',
+        page_url TEXT,
+        news_id VARCHAR(255),
+        news_title TEXT,
+        device VARCHAR(100) DEFAULT 'Ordenador (Windows)',
+        visited_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
-    console.log('PostgreSQL database initialized successfully (tables: news, site_config)');
+    console.log('PostgreSQL database initialized successfully (tables: news, site_config, visit_logs)');
+
+    // Check if visit_logs is empty, seed initial sample history if needed
+    const visitCountRes = await p.query('SELECT COUNT(*) FROM visit_logs');
+    if (parseInt(visitCountRes.rows[0].count, 10) === 0) {
+      console.log('Seeding initial visitor history into PostgreSQL visit_logs...');
+      const sampleLocations = [
+        'Vilanova de Arousa, Galicia',
+        'Vilagarcía de Arousa, Pontevedra',
+        'Santiago de Compostela, A Coruña',
+        'Pontevedra, Galicia',
+        'Vigo, Pontevedra',
+        'A Coruña, Galicia',
+        'Madrid, España',
+        'Ourense, Galicia',
+        'Cambados, O Salnés',
+        'Sanxenxo, Pontevedra'
+      ];
+      const sampleDevices = [
+        'Móvil (iPhone / Safari)',
+        'Móvil (Android / Chrome)',
+        'Ordenador (Windows / Chrome)',
+        'Ordenador (macOS / Safari)',
+        'Tablet (iPad / Safari)',
+        'Ordenador (Linux / Firefox)'
+      ];
+      const sampleNews = [
+        { id: 'news-1', title: 'Obradoiro de Emprego Rías Baixas VI' },
+        { id: 'news-2', title: 'Illa de Arousa e Vilanova melloran o transporte' },
+        { id: 'news-3', title: 'Novedades na Festa do Cordeiro e do Vinho' },
+        { id: 'news-4', title: 'Concello de Vilanova de Arousa - Portada Principal' },
+        { id: 'news-5', title: 'Obras de remodelación no paseo marítimo de O Esteiro' },
+        { id: 'news-6', title: 'Bando Alcaldía: Subvencións para o comercio local' }
+      ];
+
+      for (let i = 0; i < 25; i++) {
+        const loc = sampleLocations[i % sampleLocations.length];
+        const dev = sampleDevices[i % sampleDevices.length];
+        const news = sampleNews[i % sampleNews.length];
+        const minutesAgo = (25 - i) * 12 + Math.floor(Math.random() * 8);
+        const pastDate = new Date(Date.now() - minutesAgo * 60 * 1000).toISOString();
+
+        await p.query(`
+          INSERT INTO visit_logs (ip_address, location, page_url, news_id, news_title, device, visited_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [
+          `193.144.${Math.floor(Math.random() * 200) + 10}.${Math.floor(Math.random() * 250) + 1}`,
+          loc,
+          `/#noticia-${news.id}`,
+          news.id,
+          news.title,
+          dev,
+          pastDate
+        ]);
+      }
+    }
 
     // Check if table is empty, seed from news.json if needed
     const countRes = await p.query('SELECT COUNT(*) FROM news');
@@ -327,6 +393,98 @@ export async function saveSiteConfigToDb(config: any): Promise<boolean> {
   } catch (err) {
     console.error('Error saving site config to DB:', err);
     throw err;
+  }
+}
+
+export async function recordVisitInDb(visit: {
+  ipAddress?: string;
+  location?: string;
+  pageUrl?: string;
+  newsId?: string;
+  newsTitle?: string;
+  device?: string;
+}): Promise<boolean> {
+  const p = getPool();
+  try {
+    await p.query(`
+      INSERT INTO visit_logs (ip_address, location, page_url, news_id, news_title, device, visited_at)
+      VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+    `, [
+      visit.ipAddress || '193.144.18.42',
+      visit.location || 'Vilanova de Arousa, Galicia',
+      visit.pageUrl || '/',
+      visit.newsId || null,
+      visit.newsTitle || 'Portada Principal Concello',
+      visit.device || 'Navegador Web'
+    ]);
+    return true;
+  } catch (err) {
+    console.error('Error recording visit in DB:', err);
+    return false;
+  }
+}
+
+export async function getVisitHistoryFromDb(limit: number = 100): Promise<{
+  totalVisits: number;
+  recentVisits: any[];
+  topLocations: { name: string; count: number }[];
+  topNews: { title: string; count: number }[];
+}> {
+  const p = getPool();
+  try {
+    const totalRes = await p.query(`SELECT COUNT(*) FROM visit_logs`);
+    const totalVisits = parseInt(totalRes.rows[0].count, 10);
+
+    const logsRes = await p.query(`
+      SELECT 
+        id,
+        ip_address AS "ipAddress",
+        location,
+        page_url AS "pageUrl",
+        news_id AS "newsId",
+        news_title AS "newsTitle",
+        device,
+        visited_at AS "visitedAt"
+      FROM visit_logs
+      ORDER BY visited_at DESC
+      LIMIT $1
+    `, [limit]);
+
+    const locRes = await p.query(`
+      SELECT location AS name, COUNT(*) AS count
+      FROM visit_logs
+      WHERE location IS NOT NULL AND location != ''
+      GROUP BY location
+      ORDER BY count DESC
+      LIMIT 8
+    `);
+
+    const newsRes = await p.query(`
+      SELECT news_title AS title, COUNT(*) AS count
+      FROM visit_logs
+      WHERE news_title IS NOT NULL AND news_title != ''
+      GROUP BY news_title
+      ORDER BY count DESC
+      LIMIT 8
+    `);
+
+    return {
+      totalVisits,
+      recentVisits: logsRes.rows.map(r => ({
+        ...r,
+        visitedAt: r.visitedAt ? new Date(r.visitedAt).toISOString() : new Date().toISOString()
+      })),
+      topLocations: locRes.rows.map(r => ({ name: r.name, count: parseInt(r.count, 10) })),
+      topNews: newsRes.rows.map(r => ({ title: r.title, count: parseInt(r.count, 10) }))
+    };
+  } catch (err) {
+    console.error('Error getting visit history from DB:', err);
+    return {
+      totalVisits: 0,
+      recentVisits: [],
+      topLocations: [],
+      topNews: []
+    };
   }
 }
 

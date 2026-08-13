@@ -63,6 +63,18 @@ export default function App() {
   useEffect(() => {
     if (!siteConfig) return;
 
+    // Record initial site visit
+    try {
+      safeFetchJson('/api/visits/record', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          newsTitle: 'Portada Principal Concello',
+          pageUrl: '/'
+        })
+      });
+    } catch (e) {}
+
     // Title
     const titleToSet = siteConfig.seoTitle || siteConfig.titleText || 'Concello de Vilanova de Arousa';
     document.title = titleToSet;
@@ -199,6 +211,24 @@ export default function App() {
   // Helper to ensure news items are ordered by position
   const sortNewsByPosition = (items: NewsItem[]): NewsItem[] => {
     return [...items].sort((a, b) => (a.position || 99) - (b.position || 99));
+  };
+
+  // Select article and record visit
+  const handleSelectNews = (item: NewsItem | null) => {
+    setSelectedNews(item);
+    if (item) {
+      try {
+        safeFetchJson('/api/visits/record', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            newsId: item.id,
+            newsTitle: item.title,
+            pageUrl: `/#noticia-${item.id}`
+          })
+        });
+      } catch (e) {}
+    }
   };
 
   // Toggle bookmark article
@@ -383,7 +413,7 @@ export default function App() {
         {/* Breaking News Ticker */}
         <BreakingTicker
           breakingNews={breakingNews}
-          onSelectNews={(item) => setSelectedNews(item)}
+          onSelectNews={handleSelectNews}
         />
 
         {/* Main Content Area */}
@@ -396,7 +426,7 @@ export default function App() {
             <section>
               <HeroNews
                 news={heroNewsItem}
-                onSelectNews={(item) => setSelectedNews(item)}
+                onSelectNews={handleSelectNews}
                 isSaved={savedNewsIds.includes(heroNewsItem.id)}
                 onToggleSave={handleToggleSave}
               />
@@ -411,7 +441,7 @@ export default function App() {
                   <NewsCard
                     key={news.id}
                     news={news}
-                    onSelectNews={(item) => setSelectedNews(item)}
+                    onSelectNews={handleSelectNews}
                     isSaved={savedNewsIds.includes(news.id)}
                     onToggleSave={handleToggleSave}
                     showPositionTag={false}

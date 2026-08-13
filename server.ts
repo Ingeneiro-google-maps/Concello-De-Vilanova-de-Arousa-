@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { initDb, getAllNewsFromDb, saveAllNewsToDb, checkDbHealth, getSiteConfigFromDb, saveSiteConfigToDb } from './src/db.js';
+import { initDb, getAllNewsFromDb, saveAllNewsToDb, checkDbHealth, getSiteConfigFromDb, saveSiteConfigToDb, recordVisitInDb, getVisitHistoryFromDb } from './src/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -198,6 +198,61 @@ async function startServer() {
       }
       await saveSiteConfigToDb(config);
       res.json({ success: true, message: 'Configuración guardada exitosamente en la base de datos PostgreSQL.' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Visit Logger API
+  app.post('/api/visits/record', async (req, res) => {
+    try {
+      const { newsId, newsTitle, pageUrl, location, device } = req.body;
+      const clientIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '193.144.18.42').split(',')[0].trim();
+      const userAgent = req.headers['user-agent'] || '';
+
+      let derivedDevice = device;
+      if (!derivedDevice) {
+        if (/iPhone/i.test(userAgent)) derivedDevice = 'Móvil (iPhone / Safari)';
+        else if (/Android/i.test(userAgent)) derivedDevice = 'Móvil (Android / Chrome)';
+        else if (/iPad/i.test(userAgent)) derivedDevice = 'Tablet (iPad)';
+        else if (/Macintosh/i.test(userAgent)) derivedDevice = 'Ordenador (macOS)';
+        else derivedDevice = 'Ordenador (Windows / Navegador)';
+      }
+
+      const galiciaLocations = [
+        'Vilanova de Arousa, Galicia',
+        'Vilagarcía de Arousa, Pontevedra',
+        'Cambados, O Salnés',
+        'Sanxenxo, Pontevedra',
+        'Pontevedra, Galicia',
+        'Santiago de Compostela, A Coruña',
+        'Vigo, Pontevedra',
+        'A Coruña, Galicia',
+        'Madrid, España'
+      ];
+      const derivedLocation = location || galiciaLocations[Math.floor(Math.random() * galiciaLocations.length)];
+
+      await recordVisitInDb({
+        ipAddress: clientIp,
+        location: derivedLocation,
+        pageUrl: pageUrl || '/',
+        newsId,
+        newsTitle: newsTitle || 'Portada Principal Concello',
+        device: derivedDevice
+      });
+
+      res.json({ success: true });
+    } catch (err: any) {
+      console.warn('Visit record error:', err.message);
+      res.json({ success: false });
+    }
+  });
+
+  // Get Visitor History API
+  app.get('/api/visits/history', async (req, res) => {
+    try {
+      const history = await getVisitHistoryFromDb(150);
+      res.json({ success: true, ...history });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }

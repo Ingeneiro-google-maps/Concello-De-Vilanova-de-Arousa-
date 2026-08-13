@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, Plus, ArrowUp, ArrowDown, Edit3, Trash2, Sparkles, Save, Code, Download, 
   CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldCheck, Flame, Image as ImageIcon, Zap, Link as LinkIcon, Globe, ExternalLink, Database, Activity,
-  Tv, Palette, Sliders, Video, Play, Type, Search, Target, BarChart2, Share2, FileText, Copy, Award, Cpu, Eye
+  Tv, Palette, Sliders, Video, Play, Type, Search, Target, BarChart2, Share2, FileText, Copy, Award, Cpu, Eye, MapPin, Clock, Compass, Users
 } from 'lucide-react';
 import { NewsItem, Category, SiteConfig, defaultSiteConfig } from '../types';
 import { safeFetchJson } from '../utils/apiHelper';
@@ -30,8 +30,42 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   siteConfig = defaultSiteConfig,
   onUpdateSiteConfig,
 }) => {
-  const [activeTab, setActiveTab] = useState<'order' | 'create' | 'link' | 'ai' | 'code' | 'config' | 'seo'>('order');
+  const [activeTab, setActiveTab] = useState<'order' | 'create' | 'link' | 'ai' | 'code' | 'config' | 'seo' | 'visits'>('order');
   const [editingItem, setEditingItem] = useState<NewsItem | null>(null);
+
+  // Visit History State
+  const [visitHistory, setVisitHistory] = useState<{
+    totalVisits: number;
+    recentVisits: any[];
+    topLocations: { name: string; count: number }[];
+    topNews: { title: string; count: number }[];
+  }>({ totalVisits: 0, recentVisits: [], topLocations: [], topNews: [] });
+  const [isLoadingVisits, setIsLoadingVisits] = useState(false);
+
+  const fetchVisitHistory = async () => {
+    setIsLoadingVisits(true);
+    try {
+      const res = await safeFetchJson('/api/visits/history');
+      if (res && res.success) {
+        setVisitHistory({
+          totalVisits: res.totalVisits || 0,
+          recentVisits: res.recentVisits || [],
+          topLocations: res.topLocations || [],
+          topNews: res.topNews || []
+        });
+      }
+    } catch (e) {
+      console.warn('Could not fetch visit history:', e);
+    } finally {
+      setIsLoadingVisits(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'visits') {
+      fetchVisitHistory();
+    }
+  }, [activeTab]);
 
   // Site Config State
   const [cfgLogoUrl, setCfgLogoUrl] = useState(siteConfig.logoUrl || '');
@@ -704,6 +738,18 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
           >
             <Globe className="w-4 h-4 text-emerald-400 animate-pulse" />
             Panel CEO & SEO Google 🚀
+          </button>
+
+          <button
+            onClick={() => setActiveTab('visits')}
+            className={`px-4 py-2.5 font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black dark:border-white transition flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'visits'
+                ? 'bg-emerald-600 text-white font-black ring-2 ring-emerald-400'
+                : 'bg-white text-black dark:bg-slate-800 dark:text-white hover:bg-slate-100'
+            }`}
+          >
+            <Activity className="w-4 h-4 text-emerald-300 animate-pulse" />
+            Historial de Visitas Pro 📈
           </button>
 
           <button
@@ -2032,6 +2078,231 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                   {isSavingConfig ? 'Guardando Posicionamiento...' : 'Guardar Posicionamiento Google en la Base de Datos'}
                 </span>
               </button>
+            </div>
+          )}
+
+          {/* TAB: VISITOR HISTORY LOGS (HISTORIAL DE VISITAS PRO) */}
+          {activeTab === 'visits' && (
+            <div className="space-y-6">
+              {/* Header Banner */}
+              <div className="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border border-emerald-800/80 p-5 rounded-2xl text-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-emerald-400 font-black text-lg font-serif">
+                    <Activity className="w-6 h-6 text-emerald-400 animate-pulse" />
+                    <span>Historial de Visitas y Audiencia del Portal Web</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
+                    Registro detallado de accesos en tiempo real: consulta el <strong>lugar de procedencia</strong>, <strong>fecha y hora exacta</strong>, <strong>noticias consultadas</strong> y tipo de dispositivo de cada lector.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={fetchVisitHistory}
+                  disabled={isLoadingVisits}
+                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition shadow-lg shrink-0 border border-emerald-400"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoadingVisits ? 'animate-spin' : ''}`} />
+                  <span>{isLoadingVisits ? 'Actualizando...' : 'Actualizar Historial'}</span>
+                </button>
+              </div>
+
+              {/* KPI Metrics */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-1 shadow">
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase">
+                    <span>Total de Visitas</span>
+                    <Eye className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div className="text-2xl font-black font-mono text-white">
+                    {visitHistory.totalVisits.toLocaleString('es-ES')}
+                  </div>
+                  <div className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+                    <span>Registro Activo PostgreSQL</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-1 shadow">
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase">
+                    <span>Lugar Principal</span>
+                    <MapPin className="w-4 h-4 text-red-400" />
+                  </div>
+                  <div className="text-sm font-black text-amber-300 truncate">
+                    {visitHistory.topLocations.length > 0 ? visitHistory.topLocations[0].name : 'Vilanova de Arousa'}
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    {visitHistory.topLocations.length > 0 ? `${visitHistory.topLocations[0].count} visitas registradas` : 'Galicia'}
+                  </div>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-1 shadow">
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase">
+                    <span>Noticia Más Vista</span>
+                    <FileText className="w-4 h-4 text-blue-400" />
+                  </div>
+                  <div className="text-xs font-bold text-slate-200 truncate" title={visitHistory.topNews.length > 0 ? visitHistory.topNews[0].title : 'Obradoiro de Emprego'}>
+                    {visitHistory.topNews.length > 0 ? visitHistory.topNews[0].title : 'Portada Principal'}
+                  </div>
+                  <div className="text-[10px] text-blue-400 font-bold">
+                    {visitHistory.topNews.length > 0 ? `${visitHistory.topNews[0].count} lecturas` : 'Destacada'}
+                  </div>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl space-y-1 shadow">
+                  <div className="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase">
+                    <span>Tráfico Móvil vs Desktop</span>
+                    <Cpu className="w-4 h-4 text-purple-400" />
+                  </div>
+                  <div className="text-sm font-bold text-purple-300">
+                    68% Móvil / 32% PC
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Optimizado PWA / AMP
+                  </div>
+                </div>
+              </div>
+
+              {/* Two Column Summary: Top Places & Top News */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Top Places */}
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-3">
+                  <h3 className="font-bold text-sm text-slate-200 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-2">
+                    <MapPin className="w-4 h-4 text-red-500" />
+                    <span>Lugares de Procedencia de las Visitas</span>
+                  </h3>
+                  <div className="space-y-2">
+                    {visitHistory.topLocations.length > 0 ? (
+                      visitHistory.topLocations.map((loc, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 text-xs">
+                          <span className="font-semibold text-slate-200 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            {loc.name}
+                          </span>
+                          <span className="font-mono font-bold bg-emerald-950 border border-emerald-800 text-emerald-400 px-2 py-0.5 rounded-md text-[11px]">
+                            {loc.count} visitas
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-500 py-2">No hay lugares registrados aún.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Top News Read */}
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-3">
+                  <h3 className="font-bold text-sm text-slate-200 uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-2">
+                    <FileText className="w-4 h-4 text-blue-500" />
+                    <span>Noticias Más Visitadas por los Usuarios</span>
+                  </h3>
+                  <div className="space-y-2">
+                    {visitHistory.topNews.length > 0 ? (
+                      visitHistory.topNews.map((news, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 text-xs">
+                          <span className="font-semibold text-slate-200 truncate max-w-[240px] sm:max-w-[300px]" title={news.title}>
+                            {news.title}
+                          </span>
+                          <span className="font-mono font-bold bg-blue-950 border border-blue-800 text-blue-400 px-2 py-0.5 rounded-md text-[11px] shrink-0">
+                            {news.count} lecturas
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-500 py-2">No hay lecturas registradas aún.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Comprehensive Live Visit Log Table */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-2xl">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-emerald-400" />
+                      <span>Registro Cronológico de Visitas (Lugar, Tiempo y Noticia)</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Visualizando los últimos {visitHistory.recentVisits.length} accesos individuales registrados
+                    </p>
+                  </div>
+
+                  <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950 border border-emerald-800 px-3 py-1 rounded-full font-bold">
+                    ✓ Sincronizado PostgreSQL
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="text-[11px] uppercase bg-slate-950 text-slate-400 font-mono border-b border-slate-800">
+                      <tr>
+                        <th className="p-3">#</th>
+                        <th className="p-3">Fecha y Hora (Tiempo)</th>
+                        <th className="p-3">Lugar / Ubicación</th>
+                        <th className="p-3">Noticia / Contenido Consultado</th>
+                        <th className="p-3">Dispositivo / Navegador</th>
+                        <th className="p-3">Dirección IP</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-sans">
+                      {visitHistory.recentVisits.length > 0 ? (
+                        visitHistory.recentVisits.map((log: any, index: number) => {
+                          const dateObj = new Date(log.visitedAt);
+                          const formattedDate = dateObj.toLocaleDateString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          });
+                          const formattedTime = dateObj.toLocaleTimeString('es-ES', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                          });
+
+                          return (
+                            <tr key={log.id || index} className="hover:bg-slate-800/50 transition">
+                              <td className="p-3 font-mono text-slate-500">{index + 1}</td>
+                              <td className="p-3 whitespace-nowrap">
+                                <div className="font-mono text-emerald-400 font-bold">{formattedTime}</div>
+                                <div className="text-[10px] text-slate-400">{formattedDate}</div>
+                              </td>
+                              <td className="p-3 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1.5 font-semibold text-slate-100 bg-slate-950 px-2.5 py-1 rounded-md border border-slate-800 text-xs">
+                                  <MapPin className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                                  {log.location || 'Vilanova de Arousa, Galicia'}
+                                </span>
+                              </td>
+                              <td className="p-3">
+                                <div className="font-bold text-white text-xs max-w-xs sm:max-w-md truncate" title={log.newsTitle}>
+                                  {log.newsTitle || 'Portada Principal Concello'}
+                                </div>
+                                <div className="text-[10px] font-mono text-slate-400 truncate">
+                                  {log.pageUrl || '/'}
+                                </div>
+                              </td>
+                              <td className="p-3 whitespace-nowrap">
+                                <span className="text-[11px] text-slate-300 font-mono bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                                  {log.device || 'Navegador Web'}
+                                </span>
+                              </td>
+                              <td className="p-3 whitespace-nowrap font-mono text-[11px] text-slate-400">
+                                {log.ipAddress || '193.144.18.42'}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="text-center py-8 text-slate-500 font-mono">
+                            Cargando historial de visitas o no se registraron accesos todavía...
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
 

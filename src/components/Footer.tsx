@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Mail, Send, Lock, Code } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Send, Lock, Code, Eye, TrendingUp } from 'lucide-react';
 import { Category } from '../types';
 import { CoatOfArmsLogo } from './CoatOfArmsLogo';
 
@@ -16,6 +16,25 @@ export const Footer: React.FC<FooterProps> = ({
 }) => {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+
+  // Counter logic: Starts at 30 visits base, increases by 23 visits every 3 hours
+  const calculateVisits = () => {
+    const ANCHOR_TIME = new Date('2026-01-01T00:00:00Z').getTime();
+    const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+    const elapsed = Math.max(0, Date.now() - ANCHOR_TIME);
+    const periods = Math.floor(elapsed / THREE_HOURS_MS);
+    const BASE_VISITS = 30;
+    return BASE_VISITS + (periods * 23);
+  };
+
+  const [visits, setVisits] = useState<number>(calculateVisits);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisits(calculateVisits());
+    }, 10000); // Check every 10 seconds for rollover
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,11 +130,25 @@ export const Footer: React.FC<FooterProps> = ({
         </div>
       </div>
 
-      {/* Bottom Bar */}
-      <div className="border-t border-gray-900 py-4 px-4 sm:px-8 text-center text-[11px] text-gray-500">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      {/* Bottom Bar with Visit Counter */}
+      <div className="border-t border-gray-900 py-4 px-4 sm:px-8 text-center text-[11px] text-gray-500 bg-gray-950">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <p>© {new Date().getFullYear()} Concello de Vilanova de Arousa. Todos los derechos reservados.</p>
-          <p>Portal Informativo de la Alcaldía</p>
+
+          {/* Live Visitor Counter Badge */}
+          <div className="flex items-center gap-2.5 bg-gray-900/90 border border-gray-800 px-4 py-1.5 rounded-full text-xs text-gray-300 shadow-inner">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <Eye className="w-4 h-4 text-red-500 shrink-0" />
+            <span className="font-semibold text-gray-300">Visitas al Portal:</span>
+            <span className="font-mono font-black text-white text-sm tracking-wider">
+              {visits.toLocaleString('es-ES')}
+            </span>
+          </div>
+
+          <p>Portal Informativo Oficial de la Alcaldía</p>
         </div>
       </div>
     </footer>
