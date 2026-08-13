@@ -7,12 +7,14 @@ import { NewsDetailModal } from './components/NewsDetailModal';
 import { AdminPanel } from './components/AdminPanel';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { Footer } from './components/Footer';
-import { NewsItem, Category } from './types';
+import { FeaturedVideo } from './components/FeaturedVideo';
+import { NewsItem, Category, SiteConfig, defaultSiteConfig } from './types';
 import { initialNewsData } from './data/newsData';
 import { safeFetchJson } from './utils/apiHelper';
 
 export default function App() {
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
+  const [siteConfig, setSiteConfig] = useState<SiteConfig>(defaultSiteConfig);
   const [currentCategory, setCurrentCategory] = useState<Category>('Todas');
   const [searchQuery, setSearchQuery] = useState('');
   const [savedNewsIds, setSavedNewsIds] = useState<string[]>([]);
@@ -26,6 +28,36 @@ export default function App() {
   // Direct code save state
   const [isSavingToCode, setIsSavingToCode] = useState(false);
   const [lastSaveSuccess, setLastSaveSuccess] = useState<boolean | null>(null);
+
+  // Fetch Site Configuration from PostgreSQL DB
+  const fetchSiteConfig = async () => {
+    try {
+      const data = await safeFetchJson('/api/config');
+      if (data && data.success && data.config) {
+        setSiteConfig(data.config);
+      }
+    } catch (err) {
+      console.warn('Could not fetch site config from DB:', err);
+    }
+  };
+
+  // Save Site Configuration to PostgreSQL DB
+  const handleUpdateSiteConfig = async (newConfig: SiteConfig): Promise<boolean> => {
+    setSiteConfig(newConfig);
+    try {
+      const data = await safeFetchJson('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: newConfig }),
+      });
+      if (data && data.success) {
+        return true;
+      }
+    } catch (err) {
+      console.error('Error saving site config:', err);
+    }
+    return false;
+  };
 
   // Initial Load
   useEffect(() => {
@@ -70,14 +102,17 @@ export default function App() {
     };
 
     fetchNewsFromApi();
+    fetchSiteConfig();
 
     // Auto-refresh from PostgreSQL DB every 20 seconds to stay synced globally
     const interval = setInterval(() => {
       fetchNewsFromApi();
+      fetchSiteConfig();
     }, 20000);
 
     const handleFocus = () => {
       fetchNewsFromApi();
+      fetchSiteConfig();
     };
     window.addEventListener('focus', handleFocus);
 
@@ -279,6 +314,7 @@ export default function App() {
           onSaveToCodeDirectly={handleSaveToCodeDirectly}
           isSavingToCode={isSavingToCode}
           lastSaveSuccess={lastSaveSuccess}
+          siteConfig={siteConfig}
         />
 
         {/* Breaking News Ticker */}
@@ -289,6 +325,9 @@ export default function App() {
 
         {/* Main Content Area */}
         <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-8">
+          {/* Featured YouTube Video (Noticia Importante) */}
+          <FeaturedVideo config={siteConfig} />
+
           {/* Featured Position #1 Hero Article */}
           {heroNewsItem && (
             <section>
@@ -369,6 +408,8 @@ export default function App() {
           onSaveToCodeDirectly={handleSaveToCodeDirectly}
           isSavingToCode={isSavingToCode}
           lastSaveSuccess={lastSaveSuccess}
+          siteConfig={siteConfig}
+          onUpdateSiteConfig={handleUpdateSiteConfig}
         />
       )}
 

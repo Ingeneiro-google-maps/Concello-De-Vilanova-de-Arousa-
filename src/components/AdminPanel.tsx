@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Plus, ArrowUp, ArrowDown, Edit3, Trash2, Sparkles, Save, Code, Download, 
-  CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldCheck, Flame, Image as ImageIcon, Zap, Link as LinkIcon, Globe, ExternalLink, Database, Activity
+  CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldCheck, Flame, Image as ImageIcon, Zap, Link as LinkIcon, Globe, ExternalLink, Database, Activity,
+  Tv, Palette, Sliders, Video, Play, Type
 } from 'lucide-react';
-import { NewsItem, Category } from '../types';
+import { NewsItem, Category, SiteConfig, defaultSiteConfig } from '../types';
 import { safeFetchJson } from '../utils/apiHelper';
+import { CoatOfArmsLogo } from './CoatOfArmsLogo';
+import { getYouTubeEmbedUrl } from './FeaturedVideo';
 
 interface AdminPanelProps {
   newsList: NewsItem[];
@@ -13,6 +16,8 @@ interface AdminPanelProps {
   onSaveToCodeDirectly: () => Promise<boolean>;
   isSavingToCode: boolean;
   lastSaveSuccess: boolean | null;
+  siteConfig?: SiteConfig;
+  onUpdateSiteConfig?: (newConfig: SiteConfig) => Promise<boolean>;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -22,9 +27,67 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveToCodeDirectly,
   isSavingToCode,
   lastSaveSuccess,
+  siteConfig = defaultSiteConfig,
+  onUpdateSiteConfig,
 }) => {
-  const [activeTab, setActiveTab] = useState<'order' | 'create' | 'link' | 'ai' | 'code'>('order');
+  const [activeTab, setActiveTab] = useState<'order' | 'create' | 'link' | 'ai' | 'code' | 'config'>('order');
   const [editingItem, setEditingItem] = useState<NewsItem | null>(null);
+
+  // Site Config State
+  const [cfgLogoUrl, setCfgLogoUrl] = useState(siteConfig.logoUrl || '');
+  const [cfgLogoSize, setCfgLogoSize] = useState(siteConfig.logoSize || 48);
+  const [cfgTitleColor, setCfgTitleColor] = useState(siteConfig.titleColor || '#c20000');
+  const [cfgTitleText, setCfgTitleText] = useState(siteConfig.titleText || 'Concello de Vilanova de Arousa');
+  const [cfgVideoUrl, setCfgVideoUrl] = useState(siteConfig.videoUrl || '');
+  const [cfgVideoTitle, setCfgVideoTitle] = useState(siteConfig.videoTitle || '');
+  const [cfgVideoBadge, setCfgVideoBadge] = useState(siteConfig.videoBadge || 'NOTICIA IMPORTANTE');
+  const [cfgVideoDescription, setCfgVideoDescription] = useState(siteConfig.videoDescription || '');
+  const [cfgShowVideo, setCfgShowVideo] = useState(siteConfig.showVideo !== false);
+  const [cfgAutoplayVideo, setCfgAutoplayVideo] = useState(siteConfig.autoplayVideo !== false);
+  const [cfgVideoPosition, setCfgVideoPosition] = useState<'top' | 'middle' | 'sidebar'>(siteConfig.videoPosition || 'top');
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [configSaveSuccess, setConfigSaveSuccess] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (siteConfig) {
+      setCfgLogoUrl(siteConfig.logoUrl || '');
+      setCfgLogoSize(siteConfig.logoSize || 48);
+      setCfgTitleColor(siteConfig.titleColor || '#c20000');
+      setCfgTitleText(siteConfig.titleText || 'Concello de Vilanova de Arousa');
+      setCfgVideoUrl(siteConfig.videoUrl || 'https://www.youtube.com/watch?v=40GxTki9Krc');
+      setCfgVideoTitle(siteConfig.videoTitle || 'Información y Proyectos Municipales en Vilanova de Arousa');
+      setCfgVideoBadge(siteConfig.videoBadge || 'NOTICIA IMPORTANTE');
+      setCfgVideoDescription(siteConfig.videoDescription || 'Vídeo oficial con las últimas novedades, obras e iniciativas destacadas del Concello.');
+      setCfgShowVideo(siteConfig.showVideo !== false);
+      setCfgAutoplayVideo(siteConfig.autoplayVideo !== false);
+      setCfgVideoPosition(siteConfig.videoPosition || 'top');
+    }
+  }, [siteConfig]);
+
+  const handleSaveConfig = async () => {
+    setIsSavingConfig(true);
+    setConfigSaveSuccess(null);
+    const updated: SiteConfig = {
+      logoUrl: cfgLogoUrl.trim(),
+      logoSize: Number(cfgLogoSize) || 48,
+      titleColor: cfgTitleColor.trim() || '#c20000',
+      titleText: cfgTitleText.trim() || 'Concello de Vilanova de Arousa',
+      videoUrl: cfgVideoUrl.trim() || 'https://www.youtube.com/watch?v=40GxTki9Krc',
+      videoTitle: cfgVideoTitle.trim() || 'Información y Proyectos Municipales en Vilanova de Arousa',
+      videoBadge: cfgVideoBadge.trim() || 'NOTICIA IMPORTANTE',
+      videoDescription: cfgVideoDescription.trim() || 'Vídeo oficial con las últimas novedades, obras e iniciativas destacadas del Concello.',
+      showVideo: cfgShowVideo,
+      videoPosition: cfgVideoPosition,
+      autoplayVideo: cfgAutoplayVideo,
+    };
+
+    if (onUpdateSiteConfig) {
+      const ok = await onUpdateSiteConfig(updated);
+      setConfigSaveSuccess(ok);
+      setTimeout(() => setConfigSaveSuccess(null), 3500);
+    }
+    setIsSavingConfig(false);
+  };
 
   // Form State
   const [formTitle, setFormTitle] = useState('');
@@ -582,6 +645,18 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
           </button>
 
           <button
+            onClick={() => setActiveTab('config')}
+            className={`px-4 py-2.5 font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black dark:border-white transition flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'config'
+                ? 'bg-rose-600 text-white font-black'
+                : 'bg-white text-black dark:bg-slate-800 dark:text-white hover:bg-slate-100'
+            }`}
+          >
+            <Palette className="w-4 h-4 text-amber-300" />
+            Logo, Título & Vídeo 🎥
+          </button>
+
+          <button
             onClick={() => setActiveTab('code')}
             className={`px-4 py-2.5 font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black dark:border-white transition flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'code'
@@ -1131,6 +1206,315 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                   {isGeneratingAi ? 'Generando borrador periodístico con IA Gemini...' : 'Generar Noticia Completa con IA'}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* TAB: SITE BRANDING LOGO & FEATURED VIDEO CONFIGURATION */}
+          {activeTab === 'config' && (
+            <div className="space-y-8 max-w-4xl mx-auto pb-8">
+              {/* Top Explanation Banner */}
+              <div className="bg-slate-900 border-2 border-black dark:border-white p-5 rounded-2xl text-white shadow-md">
+                <div className="flex items-center gap-2 text-rose-400 font-black text-lg uppercase tracking-wide">
+                  <Palette className="w-5 h-5 text-amber-400" />
+                  Personalización de Identidad Visual y Vídeo Destacado
+                </div>
+                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  Ajusta el logo municipal, el tamaño, el color del título principal de la cabecera ("Concello de Vilanova de Arousa") y configura el enlace de YouTube de la <strong>Noticia Importante en Vídeo</strong>. Todos los cambios se guardarán automáticamente en la Base de Datos PostgreSQL.
+                </p>
+              </div>
+
+              {/* Status Alert */}
+              {configSaveSuccess === true && (
+                <div className="p-4 bg-emerald-500 text-black font-black text-xs uppercase tracking-wider rounded-xl border-2 border-black flex items-center gap-2 shadow">
+                  <CheckCircle2 className="w-5 h-5 shrink-0" />
+                  <span>¡Configuración guardada y sincronizada exitosamente en la base de datos global!</span>
+                </div>
+              )}
+              {configSaveSuccess === false && (
+                <div className="p-4 bg-rose-600 text-white font-black text-xs uppercase tracking-wider rounded-xl border-2 border-black flex items-center gap-2 shadow">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <span>No se pudo guardar la configuración. Intenta nuevamente.</span>
+                </div>
+              )}
+
+              {/* BLOCK 1: BRANDING & HEADER LOGO/TITLE */}
+              <div className="bg-white dark:bg-slate-900 border-2 border-black dark:border-slate-700 p-6 rounded-2xl shadow-md space-y-6">
+                <div className="flex items-center gap-2 text-base font-black uppercase text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-3">
+                  <Sliders className="w-5 h-5 text-rose-600" />
+                  <span>1. Escudo / Logo Municipal y Título Principal</span>
+                </div>
+
+                {/* Logo URL Input & Preset Selector */}
+                <div className="space-y-3">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Imagen del Logo / Escudo
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="url"
+                      value={cfgLogoUrl}
+                      onChange={(e) => setCfgLogoUrl(e.target.value)}
+                      placeholder="https://ejemplo.com/logo-escudo.png (dejar vacío para usar el Escudo SVG Oficial)"
+                      className="flex-1 p-3 text-sm bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-mono focus:border-rose-500 outline-none"
+                    />
+                    {cfgLogoUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => setCfgLogoUrl('')}
+                        className="px-4 py-2.5 bg-slate-200 dark:bg-slate-800 hover:bg-rose-100 text-rose-700 dark:text-rose-400 font-bold text-xs uppercase rounded-xl transition border border-slate-300 dark:border-slate-700"
+                      >
+                        Usar Escudo SVG Oficial
+                      </button>
+                    ) : (
+                      <span className="px-3 py-2 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold text-xs rounded-xl flex items-center gap-1 shrink-0">
+                        <CheckCircle2 className="w-4 h-4" /> Escudo SVG Activo
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Logo Size Range Slider */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold uppercase text-slate-700 dark:text-slate-300">
+                    <span>Tamaño del Logo (Altura en Píxeles)</span>
+                    <span className="font-mono bg-slate-900 text-white px-2 py-0.5 rounded text-xs">
+                      {cfgLogoSize} px
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={30}
+                    max={120}
+                    step={2}
+                    value={cfgLogoSize}
+                    onChange={(e) => setCfgLogoSize(Number(e.target.value))}
+                    className="w-full accent-rose-600 cursor-pointer h-2 bg-slate-200 dark:bg-slate-700 rounded-lg"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                    <span>Pequeño (30px)</span>
+                    <span>Mediano (48px)</span>
+                    <span>Grande (120px)</span>
+                  </div>
+                </div>
+
+                {/* Header Title Text */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Texto del Título de la Cabecera
+                  </label>
+                  <input
+                    type="text"
+                    value={cfgTitleText}
+                    onChange={(e) => setCfgTitleText(e.target.value)}
+                    placeholder="Concello de Vilanova de Arousa"
+                    className="w-full p-3 text-sm bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-bold focus:border-rose-500 outline-none"
+                  />
+                </div>
+
+                {/* Header Title Color Selector & Presets */}
+                <div className="space-y-3">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Color del Título de la Cabecera ("Concello de Vilanova de Arousa")
+                  </label>
+
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-2 rounded-xl border border-slate-300 dark:border-slate-700">
+                      <input
+                        type="color"
+                        value={cfgTitleColor}
+                        onChange={(e) => setCfgTitleColor(e.target.value)}
+                        className="w-9 h-9 rounded cursor-pointer border-0 p-0 bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={cfgTitleColor}
+                        onChange={(e) => setCfgTitleColor(e.target.value)}
+                        className="w-24 text-xs font-mono font-bold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-2 py-1.5 rounded uppercase text-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {[
+                        { name: 'Rojo Galaico', color: '#c20000' },
+                        { name: 'Azul Marino', color: '#1e3a8a' },
+                        { name: 'Verde Esmeralda', color: '#047857' },
+                        { name: 'Dorado Noble', color: '#b45309' },
+                        { name: 'Negro Clásico', color: '#000000' },
+                        { name: 'Púrpura Real', color: '#6b21a8' },
+                      ].map((preset) => (
+                        <button
+                          key={preset.color}
+                          type="button"
+                          onClick={() => setCfgTitleColor(preset.color)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-xs font-bold transition hover:scale-105"
+                          style={{ backgroundColor: preset.color, color: preset.color === '#000000' || preset.color === '#c20000' || preset.color === '#1e3a8a' || preset.color === '#6b21a8' ? '#ffffff' : '#ffffff' }}
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full bg-white/40" />
+                          <span>{preset.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Masthead Preview Box */}
+                <div className="bg-slate-100 dark:bg-slate-950 p-6 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-center space-y-2">
+                  <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block">
+                    Vista Previa en Vivo de la Cabecera Web:
+                  </span>
+                  <div className="flex items-center justify-center gap-4 py-2">
+                    {cfgLogoUrl ? (
+                      <img
+                        src={cfgLogoUrl}
+                        alt="Preview Logo"
+                        className="object-contain"
+                        style={{ height: `${cfgLogoSize}px` }}
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <CoatOfArmsLogo size={cfgLogoSize} />
+                    )}
+                    <h1
+                      className="text-2xl sm:text-4xl font-black font-serif tracking-tight font-newspaper transition-colors"
+                      style={{ color: cfgTitleColor }}
+                    >
+                      {cfgTitleText || 'Concello de Vilanova de Arousa'}
+                    </h1>
+                  </div>
+                </div>
+              </div>
+
+              {/* BLOCK 2: FEATURED YOUTUBE VIDEO SECTION */}
+              <div className="bg-white dark:bg-slate-900 border-2 border-black dark:border-slate-700 p-6 rounded-2xl shadow-md space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                  <div className="flex items-center gap-2 text-base font-black uppercase text-slate-900 dark:text-white">
+                    <Video className="w-5 h-5 text-red-600" />
+                    <span>2. Vídeo Destacado YouTube ("NOTICIA IMPORTANTE")</span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={cfgShowVideo}
+                        onChange={(e) => setCfgShowVideo(e.target.checked)}
+                        className="w-4 h-4 accent-red-600 rounded cursor-pointer"
+                      />
+                      <span className="text-xs font-black uppercase text-slate-800 dark:text-slate-200">
+                        Mostrar en Portada
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer bg-amber-100 dark:bg-amber-950/60 px-3 py-1.5 rounded-xl border border-amber-300 dark:border-amber-700">
+                      <input
+                        type="checkbox"
+                        checked={cfgAutoplayVideo}
+                        onChange={(e) => setCfgAutoplayVideo(e.target.checked)}
+                        className="w-4 h-4 accent-amber-600 rounded cursor-pointer"
+                      />
+                      <span className="text-xs font-black uppercase text-amber-900 dark:text-amber-200">
+                        ▶ Autoreproducir al Cargar
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* YouTube Link Input */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Enlace o Link de YouTube
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="url"
+                      value={cfgVideoUrl}
+                      onChange={(e) => setCfgVideoUrl(e.target.value)}
+                      placeholder="https://www.youtube.com/watch?v=L_LUpnjgPso o https://youtu.be/..."
+                      className="w-full p-3.5 pl-10 text-sm bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-mono focus:border-red-500 outline-none"
+                    />
+                    <Tv className="w-5 h-5 text-red-500 absolute left-3 top-3.5" />
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Acepta enlaces directos de YouTube (ej. watch?v=..., youtu.be/..., embed/...).
+                  </p>
+                </div>
+
+                {/* Video Badge Tag & Title */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                      Etiqueta del Vídeo
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgVideoBadge}
+                      onChange={(e) => setCfgVideoBadge(e.target.value)}
+                      placeholder="NOTICIA IMPORTANTE"
+                      className="w-full p-3 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-black uppercase text-red-600 focus:border-red-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                      Título del Vídeo
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgVideoTitle}
+                      onChange={(e) => setCfgVideoTitle(e.target.value)}
+                      placeholder="Iniciativas y Mensaje Oficial del Alcalde en Vilanova"
+                      className="w-full p-3 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-bold focus:border-red-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Video Description */}
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Descripción / Subtítulo del Vídeo
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={cfgVideoDescription}
+                    onChange={(e) => setCfgVideoDescription(e.target.value)}
+                    placeholder="Resumen o detalles clave del vídeo que se mostrará junto al reproductor."
+                    className="w-full p-3 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-red-500 outline-none"
+                  />
+                </div>
+
+                {/* Live YouTube Player Preview */}
+                {cfgVideoUrl && (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block">
+                      Vista Previa del Reproductor YouTube:
+                    </span>
+                    <div className="bg-black border-2 border-slate-800 rounded-xl overflow-hidden aspect-video max-w-xl mx-auto shadow-lg">
+                      <iframe
+                        src={getYouTubeEmbedUrl(cfgVideoUrl)}
+                        title="Preview Video"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        className="w-full h-full border-0"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SAVE CONFIGURATION BUTTON */}
+              <button
+                type="button"
+                onClick={handleSaveConfig}
+                disabled={isSavingConfig}
+                className="w-full bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest py-4 rounded-xl shadow-xl transition flex items-center justify-center gap-2 border-2 border-black"
+              >
+                <Save className={`w-5 h-5 ${isSavingConfig ? 'animate-spin' : ''}`} />
+                <span>
+                  {isSavingConfig ? 'Guardando en PostgreSQL...' : 'Guardar Identidad & Vídeo en la Base de Datos'}
+                </span>
+              </button>
             </div>
           )}
 

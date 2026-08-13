@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { initDb, getAllNewsFromDb, saveAllNewsToDb, checkDbHealth } from './src/db.js';
+import { initDb, getAllNewsFromDb, saveAllNewsToDb, checkDbHealth, getSiteConfigFromDb, saveSiteConfigToDb } from './src/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -95,6 +95,29 @@ async function startServer() {
           error: err.message || 'Error al conectar con la base de datos'
         }
       });
+    }
+  });
+
+  // 2c. Get & Save Site Branding / Video Config
+  app.get('/api/config', async (req, res) => {
+    try {
+      const config = await getSiteConfigFromDb();
+      res.json({ success: true, config });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/config', async (req, res) => {
+    try {
+      const { config } = req.body;
+      if (!config) {
+        return res.status(400).json({ success: false, error: 'Se requieren los datos de configuración.' });
+      }
+      await saveSiteConfigToDb(config);
+      res.json({ success: true, message: 'Configuración guardada exitosamente en la base de datos PostgreSQL.' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 

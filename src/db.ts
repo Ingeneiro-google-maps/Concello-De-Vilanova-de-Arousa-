@@ -57,8 +57,14 @@ export async function initDb() {
         comments JSONB DEFAULT '[]'::jsonb,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS site_config (
+        id VARCHAR(50) PRIMARY KEY,
+        config_data JSONB NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
-    console.log('PostgreSQL database initialized successfully (table: news)');
+    console.log('PostgreSQL database initialized successfully (tables: news, site_config)');
 
     // Check if table is empty, seed from news.json if needed
     const countRes = await p.query('SELECT COUNT(*) FROM news');
@@ -291,4 +297,37 @@ export async function checkDbHealth(): Promise<{
     };
   }
 }
+
+export async function getSiteConfigFromDb(): Promise<any | null> {
+  const p = getPool();
+  try {
+    const res = await p.query(`SELECT config_data FROM site_config WHERE id = 'main'`);
+    if (res.rows.length > 0) {
+      const data = res.rows[0].config_data;
+      return typeof data === 'string' ? JSON.parse(data) : data;
+    }
+    return null;
+  } catch (err) {
+    console.warn('Error fetching site config from DB:', err);
+    return null;
+  }
+}
+
+export async function saveSiteConfigToDb(config: any): Promise<boolean> {
+  const p = getPool();
+  try {
+    await p.query(`
+      INSERT INTO site_config (id, config_data, updated_at)
+      VALUES ('main', $1, CURRENT_TIMESTAMP)
+      ON CONFLICT (id) DO UPDATE SET
+        config_data = EXCLUDED.config_data,
+        updated_at = CURRENT_TIMESTAMP
+    `, [JSON.stringify(config)]);
+    return true;
+  } catch (err) {
+    console.error('Error saving site config to DB:', err);
+    throw err;
+  }
+}
+
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Menu, User, Bookmark, RefreshCw, LayoutDashboard, Sun, Moon } from 'lucide-react';
-import { Category } from '../types';
+import { Category, SiteConfig, defaultSiteConfig } from '../types';
 import { CoatOfArmsLogo } from './CoatOfArmsLogo';
 
 interface HeaderProps {
@@ -15,6 +15,7 @@ interface HeaderProps {
   onSaveToCodeDirectly: () => void;
   isSavingToCode: boolean;
   lastSaveSuccess: boolean | null;
+  siteConfig?: SiteConfig;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,7 +29,8 @@ export const Header: React.FC<HeaderProps> = ({
   isSavedView,
   onSaveToCodeDirectly,
   isSavingToCode,
-  lastSaveSuccess
+  lastSaveSuccess,
+  siteConfig = defaultSiteConfig
 }) => {
   const [currentDate, setCurrentDate] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -53,6 +55,10 @@ export const Header: React.FC<HeaderProps> = ({
       document.documentElement.classList.remove('dark');
     }
   };
+
+  const logoSizePx = siteConfig?.logoSize || 48;
+  const titleColor = siteConfig?.titleColor || '#c20000';
+  const titleText = siteConfig?.titleText || 'Concello de Vilanova de Arousa';
 
   return (
     <header className="w-full bg-white dark:bg-black transition-colors font-sans-ui border-b border-gray-200 dark:border-gray-800">
@@ -80,12 +86,32 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </div>
 
-        {/* Center: Brand Title + Coat of Arms Logo */}
+        {/* Center: Brand Title + Coat of Arms Logo or Custom Logo */}
         <div className="flex items-center gap-3 sm:gap-4 cursor-pointer" onClick={() => onSelectCategory('Todas')}>
-          <CoatOfArmsLogo className="w-9 h-11 sm:w-12 sm:h-14 shrink-0 drop-shadow-sm" />
+          {siteConfig?.logoUrl ? (
+            <img 
+              src={siteConfig.logoUrl} 
+              alt="Logo Concello" 
+              className="object-contain drop-shadow-sm shrink-0"
+              style={{ height: `${logoSizePx}px`, maxWidth: `${logoSizePx * 2.5}px` }}
+              onError={(e) => {
+                // If custom image fails to load, fallback safely
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <CoatOfArmsLogo 
+              size={logoSizePx} 
+              className="shrink-0 drop-shadow-sm" 
+            />
+          )}
+
           <div className="text-center">
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight text-[#c20000] dark:text-red-500 font-serif font-newspaper select-none">
-              Concello De Vilanova de Arousa
+            <h1 
+              className="text-2xl sm:text-4xl lg:text-5xl font-black tracking-tight font-serif font-newspaper select-none transition-colors"
+              style={{ color: titleColor }}
+            >
+              {titleText}
             </h1>
             <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 font-sans tracking-widest uppercase font-semibold mt-0.5">
               Portal Informativo Oficial de la Alcaldía

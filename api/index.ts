@@ -1,6 +1,6 @@
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
-import { initDb, getAllNewsFromDb, saveAllNewsToDb, checkDbHealth } from '../src/db.js';
+import { initDb, getAllNewsFromDb, saveAllNewsToDb, checkDbHealth, getSiteConfigFromDb, saveSiteConfigToDb } from '../src/db.js';
 
 const app = express();
 
@@ -53,6 +53,31 @@ app.get('/api/db-health', async (req, res) => {
     res.json({ success: true, health });
   } catch (err: any) {
     res.status(500).json({ success: false, health: { connected: false, error: err.message } });
+  }
+});
+
+// 3b. Site Configuration
+app.get('/api/config', async (req, res) => {
+  await ensureDb();
+  try {
+    const config = await getSiteConfigFromDb();
+    res.json({ success: true, config });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/config', async (req, res) => {
+  await ensureDb();
+  try {
+    const { config } = req.body;
+    if (!config) {
+      return res.status(400).json({ success: false, error: 'Se requiere la configuración.' });
+    }
+    await saveSiteConfigToDb(config);
+    res.json({ success: true, message: 'Configuración guardada' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
