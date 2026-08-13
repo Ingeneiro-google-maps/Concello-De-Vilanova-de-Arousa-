@@ -1,7 +1,32 @@
 export type Category = 
   | 'Todas'
   | 'Alcaldía'
+  | 'Obras'
+  | 'Deportes'
+  | 'Cultura'
+  | 'Turismo'
+  | 'Servicios'
+  | 'Eventos'
   | 'Municipal';
+
+export interface CategoryInfo {
+  id: Category;
+  label: string;
+  badgeBg: string;
+  badgeText: string;
+}
+
+export const CATEGORIES_LIST: CategoryInfo[] = [
+  { id: 'Todas', label: 'Todas las Noticias', badgeBg: 'bg-slate-900 dark:bg-slate-100', badgeText: 'text-white dark:text-slate-900' },
+  { id: 'Alcaldía', label: 'Alcaldía', badgeBg: 'bg-rose-700', badgeText: 'text-white' },
+  { id: 'Obras', label: 'Obras e Infraestructuras', badgeBg: 'bg-amber-600', badgeText: 'text-white' },
+  { id: 'Deportes', label: 'Deportes', badgeBg: 'bg-blue-600', badgeText: 'text-white' },
+  { id: 'Cultura', label: 'Cultura', badgeBg: 'bg-purple-600', badgeText: 'text-white' },
+  { id: 'Turismo', label: 'Turismo e Mar', badgeBg: 'bg-emerald-600', badgeText: 'text-white' },
+  { id: 'Servicios', label: 'Servicios Sociales', badgeBg: 'bg-teal-600', badgeText: 'text-white' },
+  { id: 'Eventos', label: 'Eventos e Agenda', badgeBg: 'bg-fuchsia-600', badgeText: 'text-white' },
+  { id: 'Municipal', label: 'Municipal', badgeBg: 'bg-slate-800 dark:bg-slate-200', badgeText: 'text-white dark:text-slate-900' },
+];
 
 export interface Comment {
   id: string;

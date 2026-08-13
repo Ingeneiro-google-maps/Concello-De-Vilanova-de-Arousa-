@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { initDb, getAllNewsFromDb, saveAllNewsToDb, checkDbHealth, getSiteConfigFromDb, saveSiteConfigToDb, recordVisitInDb, getVisitHistoryFromDb } from './src/db.js';
+import { initDb, getAllNewsFromDb, saveAllNewsToDb, checkDbHealth, getSiteConfigFromDb, saveSiteConfigToDb, recordVisitInDb, getVisitHistoryFromDb, saveSitemapXmlToDb, getSitemapXmlFromDb } from './src/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -111,6 +111,14 @@ async function startServer() {
   // Dynamic Sitemap.xml route for Google Search Console indexing
   app.get('/sitemap.xml', async (req, res) => {
     try {
+      // 1. First check if stored in DB
+      const stored = await getSitemapXmlFromDb();
+      if (stored && stored.xmlContent) {
+        res.header('Content-Type', 'application/xml');
+        return res.status(200).send(stored.xmlContent);
+      }
+
+      // 2. Generate on the fly if not yet stored
       let news: any[] = [];
       try {
         news = await getAllNewsFromDb();
@@ -123,7 +131,10 @@ async function startServer() {
         siteConfig = await getSiteConfigFromDb();
       } catch (e) {}
 
-      const baseUrl = (siteConfig && siteConfig.canonicalUrl) ? siteConfig.canonicalUrl : 'https://vilanova-de-arousa.gal';
+      const hostHeader = req.headers.host || 'vilanova-de-arousa.gal';
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const defaultDomain = `${protocol}://${hostHeader}`;
+      const baseUrl = (siteConfig && siteConfig.canonicalUrl) ? siteConfig.canonicalUrl : defaultDomain;
       const escapeXml = (str: string) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
       const todayIso = new Date().toISOString().split('T')[0];
@@ -183,10 +194,59 @@ async function startServer() {
 
       xml += `</urlset>`;
 
+      // Save generated sitemap to DB
+      try {
+        await saveSitemapXmlToDb(xml, news.length + 8);
+      } catch (e) {}
+
       res.header('Content-Type', 'application/xml');
       res.status(200).send(xml);
     } catch (err: any) {
       res.status(500).send('Error generating sitemap');
+    }
+  });
+
+  // Save Sitemap XML to PostgreSQL
+  app.post('/api/sitemap/save', async (req, res) => {
+    try {
+      const { xmlContent, urlCount } = req.body;
+      if (!xmlContent) {
+        return res.status(400).json({ success: false, error: 'Se requiere el contenido XML del sitemap.' });
+      }
+
+      await saveSitemapXmlToDb(xmlContent, urlCount || 0);
+
+      const hostHeader = req.headers.host || 'vilanova-de-arousa.gal';
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const googleLink = `${protocol}://${hostHeader}/sitemap.xml`;
+
+      res.json({
+        success: true,
+        message: 'Sitemap.xml guardado correctamente en la base de datos PostgreSQL.',
+        googleLink,
+        savedAt: new Date().toISOString()
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Get Sitemap status
+  app.get('/api/sitemap/status', async (req, res) => {
+    try {
+      const stored = await getSitemapXmlFromDb();
+      const hostHeader = req.headers.host || 'vilanova-de-arousa.gal';
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const googleLink = `${protocol}://${hostHeader}/sitemap.xml`;
+
+      res.json({
+        success: true,
+        isStored: !!stored,
+        sitemap: stored,
+        googleLink
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 

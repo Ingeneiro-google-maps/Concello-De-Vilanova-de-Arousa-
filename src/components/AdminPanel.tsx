@@ -4,7 +4,7 @@ import {
   CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldCheck, Flame, Image as ImageIcon, Zap, Link as LinkIcon, Globe, ExternalLink, Database, Activity,
   Tv, Palette, Sliders, Video, Play, Type, Search, Target, BarChart2, Share2, FileText, Copy, Award, Cpu, Eye, MapPin, Clock, Compass, Users
 } from 'lucide-react';
-import { NewsItem, Category, SiteConfig, defaultSiteConfig } from '../types';
+import { NewsItem, Category, SiteConfig, defaultSiteConfig, CATEGORIES_LIST } from '../types';
 import { safeFetchJson } from '../utils/apiHelper';
 import { CoatOfArmsLogo } from './CoatOfArmsLogo';
 import { getYouTubeEmbedUrl } from './FeaturedVideo';
@@ -93,8 +93,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [cfgStructuredDataRegion, setCfgStructuredDataRegion] = useState(siteConfig.structuredDataRegion || 'Galicia, España');
   
   const [copiedSitemap, setCopiedSitemap] = useState(false);
+  const [copiedGoogleLink, setCopiedGoogleLink] = useState(false);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [configSaveSuccess, setConfigSaveSuccess] = useState<boolean | null>(null);
+
+  // Sitemap DB State
+  const [isSavingSitemap, setIsSavingSitemap] = useState(false);
+  const [sitemapSaveMessage, setSitemapSaveMessage] = useState('');
+  const [sitemapDbStatus, setSitemapDbStatus] = useState<{ isStored: boolean; savedAt?: string; googleLink?: string }>({
+    isStored: false,
+    googleLink: typeof window !== 'undefined' ? `${window.location.origin}/sitemap.xml` : 'https://vilanova-de-arousa.gal/sitemap.xml'
+  });
+
+  const checkSitemapDbStatus = async () => {
+    try {
+      const res = await safeFetchJson('/api/sitemap/status');
+      if (res && res.success) {
+        setSitemapDbStatus({
+          isStored: res.isStored,
+          savedAt: res.sitemap?.updatedAt,
+          googleLink: res.googleLink || (typeof window !== 'undefined' ? `${window.location.origin}/sitemap.xml` : 'https://vilanova-de-arousa.gal/sitemap.xml')
+        });
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    if (activeTab === 'seo') {
+      checkSitemapDbStatus();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (siteConfig) {
@@ -156,12 +184,50 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     if (onUpdateSiteConfig) {
       const ok = await onUpdateSiteConfig(updated);
       setConfigSaveSuccess(ok);
+
+      // Automatically generate and store sitemap in DB as well
+      try {
+        const baseUrl = updated.canonicalUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://vilanova-de-arousa.gal');
+        const todayIso = new Date().toISOString().split('T')[0];
+        const escapeXml = (str: string) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+
+        let autoXml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+        autoXml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n`;
+        autoXml += `  <url><loc>${escapeXml(baseUrl)}/</loc><lastmod>${todayIso}</lastmod><changefreq>daily</changefreq><priority>1.0</priority><mobile:mobile/></url>\n`;
+        ['Alcaldia', 'Obras', 'Deportes', 'Cultura', 'Turismo', 'Servizos', 'Eventos'].forEach(cat => {
+          autoXml += `  <url><loc>${escapeXml(baseUrl)}/#categoria-${cat.toLowerCase()}</loc><lastmod>${todayIso}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>\n`;
+        });
+        newsList.forEach((item) => {
+          const itemDate = item.date ? item.date.split('T')[0] : todayIso;
+          autoXml += `  <url><loc>${escapeXml(baseUrl)}/#noticia-${escapeXml(item.id)}</loc><lastmod>${itemDate}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority>`;
+          autoXml += `<news:news><news:publication><news:name>${escapeXml(updated.structuredDataOrgName || 'Concello de Vilanova de Arousa')}</news:name><news:language>es</news:language></news:publication><news:publication_date>${itemDate}</news:publication_date><news:title>${escapeXml(item.title)}</news:title></news:news>`;
+          if (item.imageUrl) autoXml += `<image:image><image:loc>${escapeXml(item.imageUrl)}</image:loc><image:title>${escapeXml(item.title)}</image:title></image:image>`;
+          autoXml += `</url>\n`;
+        });
+        autoXml += `</urlset>`;
+
+        const sRes = await safeFetchJson('/api/sitemap/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ xmlContent: autoXml, urlCount: newsList.length + 8 })
+        });
+
+        if (sRes && sRes.success) {
+          setSitemapDbStatus({
+            isStored: true,
+            savedAt: sRes.savedAt || new Date().toISOString(),
+            googleLink: sRes.googleLink || `${typeof window !== 'undefined' ? window.location.origin : 'https://vilanova-de-arousa.gal'}/sitemap.xml`
+          });
+        }
+      } catch (e) {}
+
       setTimeout(() => setConfigSaveSuccess(null), 3500);
     }
     setIsSavingConfig(false);
   };
 
   // Form State
+  const [orderCategoryFilter, setOrderCategoryFilter] = useState<Category>('Todas');
   const [formTitle, setFormTitle] = useState('');
   const [formSubtitle, setFormSubtitle] = useState('');
   const [formContent, setFormContent] = useState('');
@@ -770,17 +836,51 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
           {/* TAB 1: REORDER & POSITION MANAGEMENT */}
           {activeTab === 'order' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs text-slate-500 dark:text-slate-400 gap-2 mb-2">
                 <span>Las noticias se muestran en la portada según su <strong>Posición (1, 2, 3...)</strong>.</span>
                 <span>Usa las flechas ▲ ▼ para cambiar el orden fácilmente.</span>
               </div>
 
+              {/* Category Filter Pills */}
+              <div className="bg-slate-100 dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+                <span className="text-[11px] font-black uppercase text-slate-600 dark:text-slate-400 tracking-wider">Filtrar lista por categoría:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {CATEGORIES_LIST.map((cat) => {
+                    const count = cat.id === 'Todas' 
+                      ? newsList.length 
+                      : newsList.filter(n => n.category === cat.id).length;
+                    const isSelected = orderCategoryFilter === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setOrderCategoryFilter(cat.id)}
+                        className={`px-2.5 py-1 text-[11px] font-black uppercase tracking-wider rounded-lg transition border flex items-center gap-1 ${
+                          isSelected
+                            ? 'bg-rose-600 text-white border-rose-500 shadow-sm'
+                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-rose-400'
+                        }`}
+                      >
+                        <span>{cat.label}</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-white text-rose-700' : 'bg-slate-200 dark:bg-slate-700'}`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="space-y-3">
-                {newsList.map((item, index) => (
+                {newsList
+                  .filter((item) => orderCategoryFilter === 'Todas' || item.category === orderCategoryFilter)
+                  .map((item) => {
+                    const originalIndex = newsList.findIndex(n => n.id === item.id);
+                    return (
                   <div
                     key={item.id}
                     className={`p-4 border-2 border-black dark:border-white transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
-                      index === 0
+                      originalIndex === 0
                         ? 'bg-amber-300 text-black'
                         : 'bg-white dark:bg-black text-black dark:text-white'
                     }`}
@@ -805,11 +905,16 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
 
                       {/* Title & Details */}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="bg-black text-white dark:bg-white dark:text-black text-[10px] font-black px-2 py-0.5 border border-black uppercase tracking-wider">
-                            {item.category}
-                          </span>
-                          {index === 0 && (
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          {(() => {
+                            const catInfo = CATEGORIES_LIST.find(c => c.id === item.category);
+                            return (
+                              <span className={`${catInfo?.badgeBg || 'bg-black'} ${catInfo?.badgeText || 'text-white'} text-[10px] font-black px-2 py-0.5 border border-black uppercase tracking-wider`}>
+                                {item.category}
+                              </span>
+                            );
+                          })()}
+                          {originalIndex === 0 && (
                             <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 border border-black uppercase tracking-widest">
                               ★ PORTADA (HERO)
                             </span>
@@ -848,8 +953,8 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
 
                       {/* Up/Down buttons */}
                       <button
-                        onClick={() => handleMoveUp(index)}
-                        disabled={index === 0}
+                        onClick={() => handleMoveUp(originalIndex)}
+                        disabled={originalIndex === 0}
                         className="p-2 border border-black dark:border-white bg-white dark:bg-black hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black disabled:opacity-30 text-black dark:text-white font-bold transition"
                         title="Subir posición"
                       >
@@ -857,8 +962,8 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                       </button>
 
                       <button
-                        onClick={() => handleMoveDown(index)}
-                        disabled={index === newsList.length - 1}
+                        onClick={() => handleMoveDown(originalIndex)}
+                        disabled={originalIndex === newsList.length - 1}
                         className="p-2 border border-black dark:border-white bg-white dark:bg-black hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black disabled:opacity-30 text-black dark:text-white font-bold transition"
                         title="Bajar posición"
                       >
@@ -884,7 +989,8 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                       </button>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             </div>
           )}
@@ -937,22 +1043,43 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                 </div>
               </div>
 
-              {/* Category, Position, Read Time Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                    Categoría
+              {/* Category Visual Pill Selector */}
+              <div className="bg-slate-50 dark:bg-slate-800/80 p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-rose-600" />
+                    <span>Categoría Oficial de la Noticia *</span>
                   </label>
-                  <select
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value as Category)}
-                    className="w-full px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:white focus:ring-2 focus:ring-rose-500 outline-none"
-                  >
-                    <option value="Todas">Todas</option>
-                    <option value="Alcaldía">Alcaldía</option>
-                    <option value="Municipal">Municipal</option>
-                  </select>
+                  <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 uppercase bg-rose-50 dark:bg-rose-950/50 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-900">
+                    Seleccionada: {formCategory}
+                  </span>
                 </div>
+
+                {/* Interactive Pills Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                  {CATEGORIES_LIST.map((cat) => {
+                    const isSelected = formCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setFormCategory(cat.id)}
+                        className={`px-3 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-1.5 border text-center ${
+                          isSelected
+                            ? 'bg-rose-600 text-white border-rose-500 shadow-lg ring-2 ring-rose-400 scale-[1.02]'
+                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-rose-400'
+                        }`}
+                      >
+                        <span>{cat.id === 'Todas' ? '🌐' : cat.id === 'Alcaldía' ? '🏛️' : cat.id === 'Obras' ? '🏗️' : cat.id === 'Deportes' ? '⚽' : cat.id === 'Cultura' ? '🎭' : cat.id === 'Turismo' ? '🌊' : cat.id === 'Servicios' ? '🤝' : cat.id === 'Eventos' ? '📅' : '📰'}</span>
+                        <span className="truncate">{cat.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Position and Read Time Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
@@ -1279,18 +1406,29 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                    Categoría sugerida
+                  <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 flex items-center justify-between">
+                    <span>Categoría sugerida para la Noticia</span>
+                    <span className="text-indigo-600 dark:text-indigo-400 font-bold">{aiCategory}</span>
                   </label>
-                  <select
-                    value={aiCategory}
-                    onChange={(e) => setAiCategory(e.target.value as Category)}
-                    className="w-full sm:w-1/2 px-3.5 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                  >
-                    <option value="Todas">Todas</option>
-                    <option value="Alcaldía">Alcaldía</option>
-                    <option value="Municipal">Municipal</option>
-                  </select>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                    {CATEGORIES_LIST.map((cat) => {
+                      const isSelected = aiCategory === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setAiCategory(cat.id)}
+                          className={`px-2.5 py-1.5 text-xs font-black uppercase tracking-wider rounded-xl transition border text-center ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white border-indigo-500 shadow-md ring-2 ring-indigo-400 scale-[1.02]'
+                              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                          }`}
+                        >
+                          <span>{cat.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <button
@@ -1923,10 +2061,10 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                 </div>
               </div>
 
-              {/* SECTION 5: GENERADOR & DESCARGADOR SITEMAP.XML SUPER FULL */}
+              {/* SECTION 5: GENERADOR & DESCARGADOR SITEMAP.XML SUPER FULL CON GUARDADO EN DB */}
               <div className="bg-slate-900 border-2 border-slate-800 p-6 rounded-2xl text-white space-y-5 shadow-2xl">
                 {(() => {
-                  const baseUrl = cfgCanonicalUrl || 'https://vilanova-de-arousa.gal';
+                  const baseUrl = cfgCanonicalUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://vilanova-de-arousa.gal');
                   const todayIso = new Date().toISOString().split('T')[0];
                   const escapeXml = (str: string) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
@@ -1992,6 +2130,34 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
 
                   fullXml += `</urlset>`;
 
+                  const totalUrlCount = newsList.length + 8;
+                  const googleLinkToDisplay = sitemapDbStatus.googleLink || `${typeof window !== 'undefined' ? window.location.origin : 'https://vilanova-de-arousa.gal'}/sitemap.xml`;
+
+                  const handleSaveSitemapToDb = async () => {
+                    setIsSavingSitemap(true);
+                    setSitemapSaveMessage('');
+                    try {
+                      const res = await safeFetchJson('/api/sitemap/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ xmlContent: fullXml, urlCount: totalUrlCount })
+                      });
+                      if (res && res.success) {
+                        setSitemapDbStatus({
+                          isStored: true,
+                          savedAt: res.savedAt || new Date().toISOString(),
+                          googleLink: res.googleLink || googleLinkToDisplay
+                        });
+                        setSitemapSaveMessage('✓ ¡Sitemap.xml guardado exitosamente en la base de datos PostgreSQL!');
+                        setTimeout(() => setSitemapSaveMessage(''), 4500);
+                      }
+                    } catch (e) {
+                      setSitemapSaveMessage('Error al guardar el sitemap en la base de datos.');
+                    } finally {
+                      setIsSavingSitemap(false);
+                    }
+                  };
+
                   const handleDownloadSitemap = () => {
                     const blob = new Blob([fullXml], { type: 'application/xml;charset=utf-8;' });
                     const url = URL.createObjectURL(blob);
@@ -2019,11 +2185,21 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                         <div className="flex items-center gap-2 flex-wrap">
                           <button
                             type="button"
-                            onClick={handleDownloadSitemap}
-                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2 rounded-xl text-xs uppercase tracking-wider transition shadow-lg border border-emerald-400"
+                            onClick={handleSaveSitemapToDb}
+                            disabled={isSavingSitemap}
+                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition shadow-lg border-2 border-emerald-400"
                           >
-                            <Download className="w-4 h-4" />
-                            <span>Descargar sitemap.xml</span>
+                            <Database className={`w-4 h-4 ${isSavingSitemap ? 'animate-spin' : ''}`} />
+                            <span>{isSavingSitemap ? 'Guardando en DB...' : 'Guardar Sitemap en DB'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleDownloadSitemap}
+                            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3 py-2.5 rounded-xl text-xs uppercase tracking-wider transition border border-slate-700"
+                          >
+                            <Download className="w-4 h-4 text-emerald-400" />
+                            <span>Descargar .xml</span>
                           </button>
 
                           <button
@@ -2033,9 +2209,9 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                               setCopiedSitemap(true);
                               setTimeout(() => setCopiedSitemap(false), 3000);
                             }}
-                            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3 py-2 rounded-xl text-xs transition border border-slate-700"
+                            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3 py-2.5 rounded-xl text-xs transition border border-slate-700"
                           >
-                            <Copy className="w-4 h-4" />
+                            <Copy className="w-4 h-4 text-blue-400" />
                             <span>{copiedSitemap ? '¡Copiado!' : 'Copiar XML'}</span>
                           </button>
 
@@ -2043,19 +2219,65 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                             href="/sitemap.xml"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-2 rounded-xl text-xs transition"
+                            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-2.5 rounded-xl text-xs transition"
                           >
                             <ExternalLink className="w-4 h-4" />
-                            <span>Ver /sitemap.xml</span>
+                            <span>Abrir /sitemap.xml</span>
                           </a>
                         </div>
+                      </div>
+
+                      {sitemapSaveMessage && (
+                        <div className="p-3 bg-emerald-950 border border-emerald-700 text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-2 animate-fadeIn">
+                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                          <span>{sitemapSaveMessage}</span>
+                        </div>
+                      )}
+
+                      {/* GOOGLE SEARCH CONSOLE DIRECT LINK BOX */}
+                      <div className="bg-slate-950 border-2 border-emerald-600/90 p-4 rounded-xl space-y-3 shadow-inner">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <span>Enlace Oficial Listo para Google Search Console:</span>
+                          </div>
+                          {sitemapDbStatus.isStored && (
+                            <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950 border border-emerald-700 px-2.5 py-0.5 rounded-full font-bold">
+                              ✓ Almacenado en DB PostgreSQL {sitemapDbStatus.savedAt ? `(${new Date(sitemapDbStatus.savedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })})` : ''}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-center gap-2">
+                          <input
+                            type="text"
+                            readOnly
+                            value={googleLinkToDisplay}
+                            className="w-full p-2.5 text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg text-emerald-300 select-all outline-none font-bold tracking-wide"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(googleLinkToDisplay);
+                              setCopiedGoogleLink(true);
+                              setTimeout(() => setCopiedGoogleLink(false), 3000);
+                            }}
+                            className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2.5 rounded-lg text-xs uppercase tracking-wider transition border border-emerald-400 shadow-md"
+                          >
+                            <Copy className="w-4 h-4" />
+                            <span>{copiedGoogleLink ? '¡Enlace Copiado!' : 'Copiar Enlace para Google'}</span>
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-slate-400">
+                          📌 Copia este enlace directo e ingrésalo en <strong>Google Search Console &gt; Sitemaps</strong> para indexación automática.
+                        </p>
                       </div>
 
                       {/* Code Display Area */}
                       <div className="space-y-2">
                         <div className="flex justify-between items-center text-[10px] uppercase font-mono text-slate-400">
-                          <span>Vista Previa del Archivo XML Generado:</span>
-                          <span>{newsList.length + 8} URLs Indexadas</span>
+                          <span>Vista Previa del Archivo XML Guardado en DB:</span>
+                          <span>{totalUrlCount} URLs Indexadas</span>
                         </div>
                         <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 overflow-x-auto max-h-64 text-emerald-400 font-mono text-xs leading-relaxed">
                           <pre>{fullXml}</pre>

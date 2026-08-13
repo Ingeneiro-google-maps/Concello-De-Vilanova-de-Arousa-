@@ -1,6 +1,6 @@
 import React from 'react';
 import { Camera, Play, Bookmark, ExternalLink } from 'lucide-react';
-import { NewsItem } from '../types';
+import { NewsItem, CATEGORIES_LIST } from '../types';
 
 interface NewsCardProps {
   news: NewsItem;
@@ -41,6 +41,16 @@ export const NewsCard: React.FC<NewsCardProps> = ({
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover group-hover:scale-[1.03] transition duration-300"
           />
+
+          {/* Category Badge */}
+          {(() => {
+            const catInfo = CATEGORIES_LIST.find(c => c.id === news.category);
+            return (
+              <div className={`absolute top-2 left-2 ${catInfo?.badgeBg || 'bg-rose-700'} ${catInfo?.badgeText || 'text-white'} text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded shadow-md border border-white/20`}>
+                {news.category || 'Alcaldía'}
+              </div>
+            );
+          })()}
 
           {/* Media Badge (Camera or Play Icon) */}
           <div className="absolute bottom-2 left-2 bg-black/80 text-white p-1.5 rounded-sm">

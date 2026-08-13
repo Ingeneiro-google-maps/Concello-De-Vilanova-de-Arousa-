@@ -28,8 +28,11 @@ export const HeroNews: React.FC<HeroNewsProps> = ({
     <div className="bg-white dark:bg-black border-b border-gray-300 dark:border-gray-800 pb-6 mb-6">
       {/* Top Topic Tag Bar with Thick Black Line */}
       <div className="border-b-2 border-black dark:border-white pb-1.5 mb-5">
-        <h3 className="text-xl sm:text-2xl font-black font-serif text-black dark:text-white uppercase tracking-tight">
-          {news.category === 'Todas' ? '12 de agosto, eclipse total' : news.category}
+        <h3 className="text-xl sm:text-2xl font-black font-serif text-black dark:text-white uppercase tracking-tight flex items-center gap-2">
+          <span className="bg-rose-700 text-white text-xs px-2.5 py-0.5 font-sans font-black rounded uppercase">
+            {news.category && news.category !== 'Todas' ? news.category : 'Alcaldía'}
+          </span>
+          <span>Iniciativa Oficial</span>
         </h3>
       </div>
 

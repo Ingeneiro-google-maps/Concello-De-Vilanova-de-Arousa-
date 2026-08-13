@@ -74,8 +74,15 @@ export async function initDb() {
         device VARCHAR(100) DEFAULT 'Ordenador (Windows)',
         visited_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS sitemap_store (
+        id VARCHAR(50) PRIMARY KEY,
+        xml_content TEXT NOT NULL,
+        url_count INT DEFAULT 0,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
-    console.log('PostgreSQL database initialized successfully (tables: news, site_config, visit_logs)');
+    console.log('PostgreSQL database initialized successfully (tables: news, site_config, visit_logs, sitemap_store)');
 
     // Check if visit_logs is empty, seed initial sample history if needed
     const visitCountRes = await p.query('SELECT COUNT(*) FROM visit_logs');
@@ -485,6 +492,42 @@ export async function getVisitHistoryFromDb(limit: number = 100): Promise<{
       topLocations: [],
       topNews: []
     };
+  }
+}
+
+export async function saveSitemapXmlToDb(xmlContent: string, urlCount: number = 0): Promise<boolean> {
+  const p = getPool();
+  try {
+    await p.query(`
+      INSERT INTO sitemap_store (id, xml_content, url_count, updated_at)
+      VALUES ('main', $1, $2, CURRENT_TIMESTAMP)
+      ON CONFLICT (id) DO UPDATE SET
+        xml_content = EXCLUDED.xml_content,
+        url_count = EXCLUDED.url_count,
+        updated_at = CURRENT_TIMESTAMP
+    `, [xmlContent, urlCount]);
+    return true;
+  } catch (err) {
+    console.error('Error saving sitemap.xml to DB:', err);
+    throw err;
+  }
+}
+
+export async function getSitemapXmlFromDb(): Promise<{ xmlContent: string; updatedAt: string; urlCount: number } | null> {
+  const p = getPool();
+  try {
+    const res = await p.query(`SELECT xml_content, url_count, updated_at FROM sitemap_store WHERE id = 'main'`);
+    if (res.rows.length > 0) {
+      return {
+        xmlContent: res.rows[0].xml_content,
+        urlCount: res.rows[0].url_count || 0,
+        updatedAt: res.rows[0].updated_at ? new Date(res.rows[0].updated_at).toISOString() : new Date().toISOString()
+      };
+    }
+    return null;
+  } catch (err) {
+    console.warn('Error reading sitemap.xml from DB:', err);
+    return null;
   }
 }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Menu, User, Bookmark, RefreshCw, LayoutDashboard, Sun, Moon } from 'lucide-react';
-import { Category, SiteConfig, defaultSiteConfig } from '../types';
+import { Category, SiteConfig, defaultSiteConfig, CATEGORIES_LIST } from '../types';
 import { CoatOfArmsLogo } from './CoatOfArmsLogo';
 
 interface HeaderProps {
@@ -168,6 +168,29 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-gray-100">
             Información Oficial e Iniciativas del Alcalde de Vilanova de Arousa
           </span>
+        </div>
+      </div>
+
+      {/* Category Navigation Bar */}
+      <div className="bg-slate-900 dark:bg-black text-white border-b-2 border-rose-600 shadow-md">
+        <div className="max-w-7xl mx-auto px-2 sm:px-6 flex items-center justify-start sm:justify-center overflow-x-auto py-2 gap-1.5 scrollbar-none">
+          {CATEGORIES_LIST.map((cat) => {
+            const isActive = currentCategory === cat.id && !isSavedView;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => onSelectCategory(cat.id)}
+                className={`px-3 py-1.5 text-[11px] sm:text-xs font-black uppercase tracking-wider transition rounded-lg whitespace-nowrap flex items-center gap-1.5 border ${
+                  isActive
+                    ? 'bg-rose-600 text-white border-rose-400 shadow-lg scale-105'
+                    : 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700 hover:border-slate-500'
+                }`}
+              >
+                <span>{cat.id === 'Todas' ? '🌐' : cat.id === 'Alcaldía' ? '🏛️' : cat.id === 'Obras' ? '🏗️' : cat.id === 'Deportes' ? '⚽' : cat.id === 'Cultura' ? '🎭' : cat.id === 'Turismo' ? '🌊' : cat.id === 'Servicios' ? '🤝' : cat.id === 'Eventos' ? '📅' : '📰'}</span>
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
