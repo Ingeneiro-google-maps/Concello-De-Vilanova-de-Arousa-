@@ -112,3 +112,42 @@ export const defaultSiteConfig: SiteConfig = {
   structuredDataRegion: 'Galicia, España',
 };
 
+export type MonitoredStatus = 'pending' | 'approved' | 'dismissed';
+
+export interface MonitoredNewsItem {
+  id: string;
+  title: string;
+  subtitle?: string;
+  content: string;
+  category: Category;
+  imageUrl?: string;
+  originalUrl: string;
+  sourceMedia: string;
+  author?: string;
+  publishedDate: string;
+  detectedAt: string;
+  status: MonitoredStatus;
+  relevanceScore?: number;
+  highlightPhrase?: string;
+}
+
+export interface MonitoringSettings {
+  isEnabled: boolean;
+  intervalHours: number; // default 12
+  lastScanAt?: string;
+  nextScanAt?: string;
+  keywords: string;
+  monitoredSources: string[];
+}
+
+export const DEFAULT_MONITORED_SOURCES = [
+  'La Voz de Galicia (Arousa / Pontevedra)',
+  'Diario de Arousa',
+  'Faro de Vigo (Arousa)',
+  'PontevedraViva',
+  'Nós Diario',
+  'CRTVG (Galicia Noticias)',
+  'El Correo Gallego',
+  'Cadena SER Arousa'
+];
+

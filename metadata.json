@@ -1,6 +1,6 @@
 {
   "name": "Portal de Noticias y Admin",
-  "description": "Portal de noticias interactivo con panel de administración para agregar, editar y reordenar noticias guardadas en el código.",
+  "description": "Portal de noticias interactivo con panel de administración, radar de monitoreo de medios gallegos cada 12h para Gonzalo Durán, gestión de visitas, SEO y base de datos.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

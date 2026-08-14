@@ -8,6 +8,7 @@ import { NewsItem, Category, SiteConfig, defaultSiteConfig, CATEGORIES_LIST } fr
 import { safeFetchJson } from '../utils/apiHelper';
 import { CoatOfArmsLogo } from './CoatOfArmsLogo';
 import { getYouTubeEmbedUrl } from './FeaturedVideo';
+import { GalicianNewsRadar } from './GalicianNewsRadar';
 
 interface AdminPanelProps {
   newsList: NewsItem[];
@@ -30,8 +31,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   siteConfig = defaultSiteConfig,
   onUpdateSiteConfig,
 }) => {
-  const [activeTab, setActiveTab] = useState<'order' | 'create' | 'categories' | 'visits' | 'seo' | 'link' | 'ai' | 'config' | 'code'>('order');
+  const [activeTab, setActiveTab] = useState<'order' | 'create' | 'radar' | 'categories' | 'visits' | 'seo' | 'link' | 'ai' | 'config' | 'code'>('order');
   const [editingItem, setEditingItem] = useState<NewsItem | null>(null);
+  const [radarPendingCount, setRadarPendingCount] = useState<number>(0);
+
+  const fetchRadarPendingCount = async () => {
+    try {
+      const res = await safeFetchJson('/api/monitoring/news');
+      if (res && res.success && res.stats) {
+        setRadarPendingCount(res.stats.pending || 0);
+      }
+    } catch (e) {}
+  };
+
+  const handleRefreshAllOfficialNews = async () => {
+    try {
+      const res = await safeFetchJson('/api/news');
+      if (res && res.success && res.news) {
+        onUpdateNewsList(res.news);
+      }
+      fetchRadarPendingCount();
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    fetchRadarPendingCount();
+  }, []);
 
   // Visit History State
   const [visitHistory, setVisitHistory] = useState<{
@@ -825,6 +850,28 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
               <span>2. {editingItem ? 'Editar Noticia' : 'Agregar Noticia'}</span>
             </button>
 
+            {/* 2.5 Radar de Prensa Gallega (Gonzalo Durán - Monitoreo 12h) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('radar');
+                fetchRadarPendingCount();
+              }}
+              className={`px-3.5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center gap-2 border-2 shadow-sm relative ${
+                activeTab === 'radar'
+                  ? 'bg-indigo-600 text-white border-indigo-300 ring-2 ring-cyan-400 shadow-md scale-105'
+                  : 'bg-indigo-950/80 text-indigo-200 border-indigo-700 hover:bg-indigo-900 hover:text-white'
+              }`}
+            >
+              <Radio className="w-4 h-4 text-cyan-300 animate-pulse" />
+              <span>📡 Radar Medios Gallegos</span>
+              {radarPendingCount > 0 && (
+                <span className="px-1.5 py-0.5 bg-amber-400 text-black font-black text-[10px] rounded-full shadow animate-bounce">
+                  {radarPendingCount}
+                </span>
+              )}
+            </button>
+
             {/* 3. Categorías Municipales (NUEVO TAB VISIBLE) */}
             <button
               type="button"
@@ -927,6 +974,14 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
 
         {/* Tab Content Container */}
         <div className="p-6 overflow-y-auto flex-1">
+          {/* TAB: RADAR DE MEDIOS GALLEGOS (GONZALO DURÁN) */}
+          {activeTab === 'radar' && (
+            <GalicianNewsRadar
+              onNewsAddedToOfficial={onUpdateNewsList}
+              onRefreshOfficialNews={handleRefreshAllOfficialNews}
+            />
+          )}
+
           {/* TAB 1: REORDER & POSITION MANAGEMENT */}
           {activeTab === 'order' && (
             <div className="space-y-4">

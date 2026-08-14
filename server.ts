@@ -4,7 +4,23 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
-import { initDb, getAllNewsFromDb, saveAllNewsToDb, checkDbHealth, getSiteConfigFromDb, saveSiteConfigToDb, recordVisitInDb, getVisitHistoryFromDb, saveSitemapXmlToDb, getSitemapXmlFromDb } from './src/db.js';
+import {
+  initDb,
+  getAllNewsFromDb,
+  saveAllNewsToDb,
+  checkDbHealth,
+  getSiteConfigFromDb,
+  saveSiteConfigToDb,
+  recordVisitInDb,
+  getVisitHistoryFromDb,
+  saveSitemapXmlToDb,
+  getSitemapXmlFromDb,
+  getMonitoredNewsFromDb,
+  updateMonitoredNewsStatusInDb,
+  getMonitoringSettingsFromDb,
+  saveMonitoringSettingsToDb
+} from './src/db.js';
+import { executeGalicianMediaScan, approveAndPublishMonitoredNews } from './src/monitoring.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -251,6 +267,108 @@ async function startServer() {
         sitemap: stored,
         googleLink
       });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ==========================================
+  // RADAR DE PRENSA GALLEGA (GONZALO DURÁN)
+  // ==========================================
+
+  // 1. Get Monitored News
+  app.get('/api/monitoring/news', async (req, res) => {
+    try {
+      const items = await getMonitoredNewsFromDb();
+      const settings = await getMonitoringSettingsFromDb();
+
+      const stats = {
+        total: items.length,
+        pending: items.filter(i => i.status === 'pending').length,
+        approved: items.filter(i => i.status === 'approved').length,
+        dismissed: items.filter(i => i.status === 'dismissed').length
+      };
+
+      res.json({
+        success: true,
+        items,
+        stats,
+        settings
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 2. Trigger Scan of Galician Media
+  app.post('/api/monitoring/scan', async (req, res) => {
+    try {
+      const result = await executeGalicianMediaScan();
+      res.json({
+        success: true,
+        ...result,
+        message: `Escaneo completado. Se han procesado las noticias de los medios gallegos.`
+      });
+    } catch (err: any) {
+      console.error('Error during media scan:', err);
+      res.status(500).json({ success: false, error: err.message || 'Error al escanear medios gallegos' });
+    }
+  });
+
+  // 3. Update Status (dismiss / mark pending)
+  app.post('/api/monitoring/status', async (req, res) => {
+    try {
+      const { id, status } = req.body;
+      if (!id || !status) {
+        return res.status(400).json({ success: false, error: 'Se requiere id y status (pending, approved, dismissed).' });
+      }
+
+      await updateMonitoredNewsStatusInDb(id, status);
+      res.json({ success: true, message: 'Estado actualizado correctamente.' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 4. Approve & Add directly to Official News
+  app.post('/api/monitoring/approve-and-add', async (req, res) => {
+    try {
+      const { id, customCategory, isBreaking, isHero, position } = req.body;
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'Se requiere el ID de la noticia a aprobar.' });
+      }
+
+      const result = await approveAndPublishMonitoredNews(id, {
+        customCategory,
+        isBreaking,
+        isHero,
+        position
+      });
+
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 5. Get / Save Monitoring Settings
+  app.get('/api/monitoring/settings', async (req, res) => {
+    try {
+      const settings = await getMonitoringSettingsFromDb();
+      res.json({ success: true, settings });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/monitoring/settings', async (req, res) => {
+    try {
+      const { settings } = req.body;
+      if (!settings) {
+        return res.status(400).json({ success: false, error: 'Se requieren los ajustes de monitoreo.' });
+      }
+      await saveMonitoringSettingsToDb(settings);
+      res.json({ success: true, message: 'Ajustes de monitoreo guardados correctamente.' });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -618,6 +736,49 @@ Devuelve EXCLUSIVAMENTE un objeto JSON válido con los siguientes campos:
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  // 12-Hour Automated Galician Media Background Monitoring Cron
+  const initAutomatedMediaMonitoring = () => {
+    // Initial check after 5 seconds of server startup
+    setTimeout(async () => {
+      try {
+        const settings = await getMonitoringSettingsFromDb();
+        if (settings.isEnabled) {
+          const now = Date.now();
+          const lastScan = settings.lastScanAt ? new Date(settings.lastScanAt).getTime() : 0;
+          const intervalMs = (settings.intervalHours || 12) * 60 * 60 * 1000;
+
+          if (now - lastScan >= intervalMs || !settings.lastScanAt) {
+            console.log('[Radar de Prensa Gallega] Ejecutando escaneo automático inicial (cada 12 horas)...');
+            await executeGalicianMediaScan();
+          }
+        }
+      } catch (err) {
+        console.warn('[Radar de Prensa Gallega] Error en escaneo inicial:', err);
+      }
+    }, 5000);
+
+    // Periodic check every 15 minutes to see if 12 hours have elapsed
+    setInterval(async () => {
+      try {
+        const settings = await getMonitoringSettingsFromDb();
+        if (settings.isEnabled) {
+          const now = Date.now();
+          const lastScan = settings.lastScanAt ? new Date(settings.lastScanAt).getTime() : 0;
+          const intervalMs = (settings.intervalHours || 12) * 60 * 60 * 1000;
+
+          if (now - lastScan >= intervalMs) {
+            console.log('[Radar de Prensa Gallega] Intervalo de 12 horas alcanzado. Ejecutando escaneo programado...');
+            await executeGalicianMediaScan();
+          }
+        }
+      } catch (err) {
+        console.warn('[Radar de Prensa Gallega] Error en temporizador de escaneo:', err);
+      }
+    }, 15 * 60 * 1000);
+  };
+
+  initAutomatedMediaMonitoring();
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);

@@ -1,0 +1,239 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Shield Warm Gold Gradient -->
+    <linearGradient id="shieldGold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#fff066" />
+      <stop offset="35%" stopColor="#facc15" />
+      <stop offset="100%" stopColor="#eab308" />
+    </linearGradient>
+
+    <!-- Crown Red Velvet -->
+    <linearGradient id="crownRed" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stopColor="#ef4444" />
+      <stop offset="100%" stopColor="#b91c1c" />
+    </linearGradient>
+
+    <!-- Church Stone Texture -->
+    <linearGradient id="churchStone" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#9a3412" />
+      <stop offset="100%" stopColor="#7c2d12" />
+    </linearGradient>
+
+    <!-- Clip Path for Shield Contents -->
+    <clipPath id="shieldInnerClip">
+      <path d="M 132 182 H 380 V 378 C 380 460, 256 498, 256 498 C 256 498, 132 460, 132 378 Z" />
+    </clipPath>
+  </defs>
+
+  <!-- ================= CORONA REAL (ROYAL CROWN) ================= -->
+  <g id="Crown">
+    <!-- Top Orb & Cross -->
+    <circle cx="256" cy="38" r="14" fill="#facc15" stroke="#111827" stroke-width="4" />
+    <path d="M 256 20 V 56 M 238 38 H 274" stroke="#111827" stroke-width="5" stroke-linecap="round" />
+    <circle cx="256" cy="38" r="5" fill="#3b82f6" />
+
+    <!-- Red Velvet Interior Arches -->
+    <path
+      d="M 140 162 C 140 85, 256 55, 256 55 C 256 55, 372 85, 372 162 Z"
+      fill="url(#crownRed)"
+      stroke="#111827"
+      stroke-width="6"
+    />
+
+    <!-- Crown Diadem Arches (Gold Bands) -->
+    <path
+      d="M 140 162 Q 192 65 256 55 Q 320 65 372 162"
+      fill="none"
+      stroke="#facc15"
+      stroke-width="18"
+    />
+    <path
+      d="M 140 162 Q 192 65 256 55 Q 320 65 372 162"
+      fill="none"
+      stroke="#111827"
+      stroke-width="5"
+    />
+
+    <!-- Center Vertical Arch -->
+    <path
+      d="M 256 55 V 162"
+      stroke="#facc15"
+      stroke-width="16"
+    />
+    <path
+      d="M 256 55 V 162"
+      stroke="#111827"
+      stroke-width="5"
+    />
+
+    <!-- Pearls on Arches -->
+    <circle cx="186" cy="100" r="7" fill="#ffffff" stroke="#111827" stroke-width="3" />
+    <circle cx="222" cy="72" r="7" fill="#ffffff" stroke="#111827" stroke-width="3" />
+    <circle cx="290" cy="72" r="7" fill="#ffffff" stroke="#111827" stroke-width="3" />
+    <circle cx="326" cy="100" r="7" fill="#ffffff" stroke="#111827" stroke-width="3" />
+
+    <!-- Main Crown Rim Base -->
+    <path
+      d="M 124 154 H 388 V 184 H 124 Z"
+      fill="#ca8a04"
+      stroke="#111827"
+      stroke-width="6"
+      stroke-linejoin="round"
+    />
+    
+    <!-- Crown Jewels (Rubies & Emeralds) -->
+    <polygon points="160,162 174,169 160,176 146,169" fill="#ef4444" stroke="#111827" stroke-width="2.5" />
+    <ellipse cx="208" cy="169" rx="9" ry="6" fill="#22c55e" stroke="#111827" stroke-width="2.5" />
+    <polygon points="256,162 270,169 256,176 242,169" fill="#ef4444" stroke="#111827" stroke-width="2.5" />
+    <ellipse cx="304" cy="169" rx="9" ry="6" fill="#22c55e" stroke="#111827" stroke-width="2.5" />
+    <polygon points="352,162 366,169 352,176 338,169" fill="#ef4444" stroke="#111827" stroke-width="2.5" />
+
+    <!-- Fleur-de-lis / Leaf points along crown base -->
+    <path 
+      d="M 124 154 Q 140 132 156 154 Q 180 130 204 154 Q 230 126 256 154 Q 282 126 308 154 Q 332 130 356 154 Q 372 132 388 154" 
+      fill="#facc15" 
+      stroke="#111827" 
+      stroke-width="5" 
+    />
+  </g>
+
+  <!-- ================= ESCUDO (SHIELD BODY) ================= -->
+  <g id="Shield">
+    <!-- Outer Shield Shape -->
+    <path
+      d="M 128 178 H 384 V 380 C 384 466, 256 504, 256 504 C 256 504, 128 466, 128 380 Z"
+      fill="url(#shieldGold)"
+      stroke="#111827"
+      stroke-width="9"
+      stroke-linejoin="round"
+    />
+
+    <!-- Inner Golden Field Border Line -->
+    <path
+      d="M 138 188 H 374 V 376 C 374 454, 256 492, 256 492 C 256 492, 138 454, 138 376 Z"
+      fill="none"
+      stroke="#111827"
+      stroke-width="3"
+    />
+
+    <!-- Interior Elements (Clipped inside Shield) -->
+    <g clip-path="url(#shieldInnerClip)">
+      
+      <!-- Church / Romanesque Belfry of Cálogo (Torre / Ermita) -->
+      <g id="Church">
+        <!-- Main Tower Body -->
+        <path
+          d="M 166 226 H 252 V 380 H 166 Z"
+          fill="url(#churchStone)"
+          stroke="#111827"
+          stroke-width="5"
+        />
+
+        <!-- Stone Ashlar Brick Lines -->
+        <path
+          d="M 166 248 H 252 M 166 270 H 252 M 166 292 H 252 M 166 314 H 252 M 166 336 H 252 M 166 358 H 252"
+          stroke="#451a03"
+          stroke-width="2.5"
+        />
+
+        <!-- Belfry Roof with Gable & Cross -->
+        <path
+          d="M 158 226 L 209 196 L 260 226 Z"
+          fill="#0d9488"
+          stroke="#111827"
+          stroke-width="4.5"
+        />
+        <path d="M 209 180 V 200 M 199 188 H 219" stroke="#111827" stroke-width="4.5" stroke-linecap="round" />
+
+        <!-- Bell Arches (Campanario) -->
+        <path
+          d="M 182 240 C 182 232, 202 232, 202 240 V 282 H 182 Z"
+          fill="#fef08a"
+          stroke="#111827"
+          stroke-width="3.5"
+        />
+        <path
+          d="M 216 240 C 216 232, 236 232, 236 240 V 282 H 216 Z"
+          fill="#fef08a"
+          stroke="#111827"
+          stroke-width="3.5"
+        />
+
+        <!-- Bells Inside Arches -->
+        <ellipse cx="192" cy="256" rx="4" ry="7" fill="#78350f" />
+        <ellipse cx="226" cy="256" rx="4" ry="7" fill="#78350f" />
+
+        <!-- White Steps / Escalera lateral de Cálogo -->
+        <path
+          d="M 198 336 H 244 V 344 H 208 V 352 H 220 V 360 H 232 V 368 H 244 V 376"
+          fill="#ffffff"
+          stroke="#111827"
+          stroke-width="3"
+        />
+      </g>
+
+      <!-- Leafy Green Tree (Árbol con tronco) -->
+      <g id="Tree">
+        <!-- Trunk -->
+        <path d="M 322 310 L 318 385 H 338 L 330 310 Z" fill="#78350f" stroke="#111827" stroke-width="4" />
+
+        <!-- Foliage Tree Canopy -->
+        <path
+          d="M 276 280 C 254 250, 282 210, 320 216 C 342 196, 378 216, 378 252 C 392 274, 372 316, 342 310 C 314 324, 284 310, 276 280 Z"
+          fill="#15803d"
+          stroke="#111827"
+          stroke-width="5"
+        />
+        <!-- Foliage Texture Highlights & Shadows -->
+        <circle cx="306" cy="252" r="17" fill="#22c55e" opacity="0.6" />
+        <circle cx="342" cy="260" r="14" fill="#166534" opacity="0.8" />
+        <circle cx="320" cy="285" r="12" fill="#15803d" />
+      </g>
+
+      <!-- Green Hillside / Grass Ground -->
+      <path
+        d="M 128 368 Q 208 354 256 370 Q 320 356 384 368 V 405 H 128 Z"
+        fill="#4ade80"
+        stroke="#111827"
+        stroke-width="4"
+      />
+
+      <!-- Ocean Waves of Ría de Arousa (Ondas do Mar) -->
+      <g id="OceanWaves">
+        <!-- Blue Wave 1 -->
+        <path
+          d="M 128 395 Q 160 380 192 395 T 256 395 T 320 395 T 384 395 V 425 H 128 Z"
+          fill="#2563eb"
+          stroke="#111827"
+          stroke-width="4"
+        />
+        <!-- White Wave Stripe 1 -->
+        <path
+          d="M 128 416 Q 160 406 192 416 T 256 416 T 320 416 T 384 416 V 436 H 128 Z"
+          fill="#ffffff"
+          stroke="#111827"
+          stroke-width="3.5"
+        />
+        <!-- Blue Wave 2 -->
+        <path
+          d="M 128 434 Q 160 422 192 434 T 256 434 T 320 434 T 384 434 V 465 H 128 Z"
+          fill="#1d4ed8"
+          stroke="#111827"
+          stroke-width="4"
+        />
+        <!-- White Wave Stripe 2 -->
+        <path
+          d="M 128 456 Q 160 446 192 456 T 256 456 T 320 456 T 384 456 V 476 H 128 Z"
+          fill="#ffffff"
+          stroke="#111827"
+          stroke-width="3"
+        />
+        <!-- Deep Blue Base of Shield -->
+        <path
+          d="M 128 474 Q 160 464 192 474 T 256 474 T 320 474 T 384 474 V 512 H 128 Z"
+          fill="#1e40af"
+        />
+      </g>
+    </g>
+  </g>
+</svg>

@@ -10,8 +10,13 @@ import {
   saveSitemapXmlToDb,
   getSitemapXmlFromDb,
   recordVisitInDb,
-  getVisitHistoryFromDb
+  getVisitHistoryFromDb,
+  getMonitoredNewsFromDb,
+  updateMonitoredNewsStatusInDb,
+  getMonitoringSettingsFromDb,
+  saveMonitoringSettingsToDb
 } from '../src/db.js';
+import { executeGalicianMediaScan, approveAndPublishMonitoredNews } from '../src/monitoring.js';
 
 const app = express();
 
@@ -337,6 +342,111 @@ app.get('/api/visits/history', async (req, res) => {
   try {
     const history = await getVisitHistoryFromDb(100);
     res.json({ success: true, history });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// RADAR DE PRENSA GALLEGA (GONZALO DURÁN)
+// ==========================================
+
+// Get monitored news
+app.get('/api/monitoring/news', async (req, res) => {
+  await ensureDb();
+  try {
+    const items = await getMonitoredNewsFromDb();
+    const settings = await getMonitoringSettingsFromDb();
+
+    const stats = {
+      total: items.length,
+      pending: items.filter(i => i.status === 'pending').length,
+      approved: items.filter(i => i.status === 'approved').length,
+      dismissed: items.filter(i => i.status === 'dismissed').length
+    };
+
+    res.json({
+      success: true,
+      items,
+      stats,
+      settings
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Trigger scan of Galician media
+app.post('/api/monitoring/scan', async (req, res) => {
+  await ensureDb();
+  try {
+    const result = await executeGalicianMediaScan();
+    res.json({
+      success: true,
+      ...result,
+      message: 'Escaneo de prensa gallega completado con éxito.'
+    });
+  } catch (err: any) {
+    console.error('Error in monitoring scan:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Update status of monitored news
+app.post('/api/monitoring/status', async (req, res) => {
+  await ensureDb();
+  try {
+    const { id, status } = req.body;
+    if (!id || !status) {
+      return res.status(400).json({ success: false, error: 'Se requiere id y status.' });
+    }
+    await updateMonitoredNewsStatusInDb(id, status);
+    res.json({ success: true, message: 'Estado actualizado correctamente.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Approve and add to official news
+app.post('/api/monitoring/approve-and-add', async (req, res) => {
+  await ensureDb();
+  try {
+    const { id, customCategory, isBreaking, isHero, position } = req.body;
+    if (!id) {
+      return res.status(400).json({ success: false, error: 'Se requiere el ID de la noticia a aprobar.' });
+    }
+    const result = await approveAndPublishMonitoredNews(id, {
+      customCategory,
+      isBreaking,
+      isHero,
+      position
+    });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get/Save monitoring settings
+app.get('/api/monitoring/settings', async (req, res) => {
+  await ensureDb();
+  try {
+    const settings = await getMonitoringSettingsFromDb();
+    res.json({ success: true, settings });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/monitoring/settings', async (req, res) => {
+  await ensureDb();
+  try {
+    const { settings } = req.body;
+    if (!settings) {
+      return res.status(400).json({ success: false, error: 'Se requieren los ajustes de monitoreo.' });
+    }
+    await saveMonitoringSettingsToDb(settings);
+    res.json({ success: true, message: 'Ajustes guardados correctamente.' });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

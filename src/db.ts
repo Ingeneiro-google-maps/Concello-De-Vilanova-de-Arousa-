@@ -81,8 +81,37 @@ export async function initDb() {
         url_count INT DEFAULT 0,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS monitored_news (
+        id VARCHAR(255) PRIMARY KEY,
+        title TEXT NOT NULL,
+        subtitle TEXT,
+        content TEXT,
+        category VARCHAR(100) DEFAULT 'Alcaldía',
+        image_url TEXT,
+        original_url TEXT NOT NULL,
+        source_media VARCHAR(255) NOT NULL,
+        author VARCHAR(255),
+        published_date VARCHAR(100),
+        detected_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        status VARCHAR(50) DEFAULT 'pending',
+        relevance_score INT DEFAULT 95,
+        highlight_phrase TEXT,
+        raw_data JSONB DEFAULT '{}'::jsonb
+      );
+
+      CREATE TABLE IF NOT EXISTS monitoring_settings (
+        id VARCHAR(50) PRIMARY KEY,
+        is_enabled BOOLEAN DEFAULT true,
+        interval_hours INT DEFAULT 12,
+        last_scan_at TIMESTAMP WITH TIME ZONE,
+        next_scan_at TIMESTAMP WITH TIME ZONE,
+        keywords TEXT DEFAULT 'Gonzalo Durán, Alcalde de Vilanova de Arousa, Concello de Vilanova de Arousa',
+        monitored_sources JSONB DEFAULT '["La Voz de Galicia (Arousa / Pontevedra)", "Diario de Arousa", "Faro de Vigo (Arousa)", "PontevedraViva", "Nós Diario", "CRTVG (Galicia Noticias)", "El Correo Gallego", "Cadena SER Arousa"]'::jsonb,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
     `);
-    console.log('PostgreSQL database initialized successfully (tables: news, site_config, visit_logs, sitemap_store)');
+    console.log('PostgreSQL database initialized successfully (tables: news, site_config, visit_logs, sitemap_store, monitored_news, monitoring_settings)');
 
     // Check if visit_logs is empty, seed initial sample history if needed
     const visitCountRes = await p.query('SELECT COUNT(*) FROM visit_logs');
@@ -564,6 +593,141 @@ export async function getSitemapXmlFromDb(): Promise<{ xmlContent: string; updat
   } catch (_) {}
 
   return null;
+}
+
+export async function getMonitoredNewsFromDb(): Promise<any[]> {
+  const p = getPool();
+  try {
+    const res = await p.query(`
+      SELECT 
+        id, title, subtitle, content, category, 
+        image_url as "imageUrl", original_url as "originalUrl", 
+        source_media as "sourceMedia", author, published_date as "publishedDate",
+        detected_at as "detectedAt", status, relevance_score as "relevanceScore",
+        highlight_phrase as "highlightPhrase"
+      FROM monitored_news
+      ORDER BY detected_at DESC
+      LIMIT 100
+    `);
+    return res.rows;
+  } catch (err) {
+    console.error('Error fetching monitored news from DB:', err);
+    return [];
+  }
+}
+
+export async function saveMonitoredNewsItemToDb(item: any): Promise<boolean> {
+  const p = getPool();
+  try {
+    await p.query(`
+      INSERT INTO monitored_news (
+        id, title, subtitle, content, category, image_url,
+        original_url, source_media, author, published_date,
+        detected_at, status, relevance_score, highlight_phrase, raw_data
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      ON CONFLICT (id) DO UPDATE SET
+        title = EXCLUDED.title,
+        subtitle = EXCLUDED.subtitle,
+        content = EXCLUDED.content,
+        category = EXCLUDED.category,
+        image_url = EXCLUDED.image_url,
+        original_url = EXCLUDED.original_url,
+        source_media = EXCLUDED.source_media,
+        published_date = EXCLUDED.published_date,
+        relevance_score = EXCLUDED.relevance_score,
+        highlight_phrase = EXCLUDED.highlight_phrase
+    `, [
+      item.id,
+      item.title,
+      item.subtitle || '',
+      item.content || '',
+      item.category || 'Alcaldía',
+      item.imageUrl || '',
+      item.originalUrl,
+      item.sourceMedia,
+      item.author || 'Prensa Gallega',
+      item.publishedDate || new Date().toLocaleDateString('es-ES'),
+      item.detectedAt || new Date().toISOString(),
+      item.status || 'pending',
+      item.relevanceScore || 95,
+      item.highlightPhrase || 'Gonzalo Durán, alcalde de Vilanova de Arousa',
+      JSON.stringify(item)
+    ]);
+    return true;
+  } catch (err) {
+    console.error('Error saving monitored news item to DB:', err);
+    return false;
+  }
+}
+
+export async function updateMonitoredNewsStatusInDb(id: string, status: 'pending' | 'approved' | 'dismissed'): Promise<boolean> {
+  const p = getPool();
+  try {
+    await p.query(`UPDATE monitored_news SET status = $1 WHERE id = $2`, [status, id]);
+    return true;
+  } catch (err) {
+    console.error('Error updating monitored news status in DB:', err);
+    return false;
+  }
+}
+
+export async function getMonitoringSettingsFromDb(): Promise<any> {
+  const p = getPool();
+  try {
+    const res = await p.query(`SELECT is_enabled as "isEnabled", interval_hours as "intervalHours", last_scan_at as "lastScanAt", next_scan_at as "nextScanAt", keywords, monitored_sources as "monitoredSources" FROM monitoring_settings WHERE id = 'main'`);
+    if (res.rows.length > 0) {
+      return res.rows[0];
+    }
+  } catch (err) {
+    console.warn('Error reading monitoring settings from DB:', err);
+  }
+  return {
+    isEnabled: true,
+    intervalHours: 12,
+    lastScanAt: null,
+    nextScanAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+    keywords: 'Gonzalo Durán, Alcalde de Vilanova de Arousa, Concello de Vilanova de Arousa',
+    monitoredSources: [
+      'La Voz de Galicia (Arousa / Pontevedra)',
+      'Diario de Arousa',
+      'Faro de Vigo (Arousa)',
+      'PontevedraViva',
+      'Nós Diario',
+      'CRTVG (Galicia Noticias)',
+      'El Correo Gallego',
+      'Cadena SER Arousa'
+    ]
+  };
+}
+
+export async function saveMonitoringSettingsToDb(settings: any): Promise<boolean> {
+  const p = getPool();
+  try {
+    await p.query(`
+      INSERT INTO monitoring_settings (id, is_enabled, interval_hours, last_scan_at, next_scan_at, keywords, monitored_sources, updated_at)
+      VALUES ('main', $1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+      ON CONFLICT (id) DO UPDATE SET
+        is_enabled = EXCLUDED.is_enabled,
+        interval_hours = EXCLUDED.interval_hours,
+        last_scan_at = EXCLUDED.last_scan_at,
+        next_scan_at = EXCLUDED.next_scan_at,
+        keywords = EXCLUDED.keywords,
+        monitored_sources = EXCLUDED.monitored_sources,
+        updated_at = CURRENT_TIMESTAMP
+    `, [
+      settings.isEnabled !== false,
+      settings.intervalHours || 12,
+      settings.lastScanAt ? new Date(settings.lastScanAt) : null,
+      settings.nextScanAt ? new Date(settings.nextScanAt) : null,
+      settings.keywords || 'Gonzalo Durán, Alcalde de Vilanova de Arousa, Concello de Vilanova de Arousa',
+      JSON.stringify(settings.monitoredSources || [])
+    ]);
+    return true;
+  } catch (err) {
+    console.error('Error saving monitoring settings to DB:', err);
+    return false;
+  }
 }
 
 
