@@ -63,7 +63,7 @@ export const NewsDetailModal: React.FC<NewsDetailModalProps> = ({
         <div className="sticky top-0 z-20 bg-[#fdfcf8] dark:bg-black px-6 py-4 border-b-4 border-black dark:border-white flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="bg-black text-white dark:bg-white dark:text-black font-black text-xs uppercase px-3 py-1 border border-black tracking-widest">
-              {news.category}
+              Comunicado Oficial
             </span>
             {news.isBreaking && (
               <span className="bg-rose-600 text-white font-black text-xs uppercase px-3 py-1 flex items-center gap-1 border border-black tracking-widest">

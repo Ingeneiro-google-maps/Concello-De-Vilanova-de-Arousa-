@@ -1,40 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Send, Lock, Code, Eye, TrendingUp } from 'lucide-react';
-import { Category } from '../types';
+import { SiteConfig } from '../types';
 import { CoatOfArmsLogo } from './CoatOfArmsLogo';
 
 interface FooterProps {
-  onSelectCategory: (category: Category) => void;
   onOpenAdmin: () => void;
   onSaveToCodeDirectly: () => void;
+  siteConfig?: SiteConfig;
 }
 
 export const Footer: React.FC<FooterProps> = ({
-  onSelectCategory,
   onOpenAdmin,
   onSaveToCodeDirectly,
+  siteConfig,
 }) => {
   const [email, setEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
-  // Counter logic: Starts at 30 visits base, increases by 23 visits every 3 hours
+  const baseVisits = siteConfig?.baseVisits !== undefined ? siteConfig.baseVisits : 30;
+
+  // Counter logic: Starts at baseVisits, increases by 23 visits every 3 hours
   const calculateVisits = () => {
     const ANCHOR_TIME = new Date('2026-01-01T00:00:00Z').getTime();
     const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
     const elapsed = Math.max(0, Date.now() - ANCHOR_TIME);
     const periods = Math.floor(elapsed / THREE_HOURS_MS);
-    const BASE_VISITS = 30;
-    return BASE_VISITS + (periods * 23);
+    return baseVisits + (periods * 23);
   };
 
   const [visits, setVisits] = useState<number>(calculateVisits);
+
+  useEffect(() => {
+    setVisits(calculateVisits());
+  }, [baseVisits]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setVisits(calculateVisits());
     }, 10000); // Check every 10 seconds for rollover
     return () => clearInterval(interval);
-  }, []);
+  }, [baseVisits]);
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();

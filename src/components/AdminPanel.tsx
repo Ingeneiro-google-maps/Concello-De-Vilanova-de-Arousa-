@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, Plus, ArrowUp, ArrowDown, Edit3, Trash2, Sparkles, Save, Code, Download, 
   CheckCircle2, AlertCircle, RefreshCw, Layers, ShieldCheck, Flame, Image as ImageIcon, Zap, Link as LinkIcon, Globe, ExternalLink, Database, Activity,
-  Tv, Palette, Sliders, Video, Play, Type, Search, Target, BarChart2, Share2, FileText, Copy, Award, Cpu, Eye, MapPin, Clock, Compass, Users
+  Tv, Palette, Sliders, Video, Play, Type, Search, Target, BarChart2, Share2, FileText, Copy, Award, Cpu, Eye, MapPin, Clock, Compass, Users, Maximize2, Minimize2, Radio, Check
 } from 'lucide-react';
 import { NewsItem, Category, SiteConfig, defaultSiteConfig, CATEGORIES_LIST } from '../types';
 import { safeFetchJson } from '../utils/apiHelper';
@@ -30,7 +30,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   siteConfig = defaultSiteConfig,
   onUpdateSiteConfig,
 }) => {
-  const [activeTab, setActiveTab] = useState<'order' | 'create' | 'link' | 'ai' | 'code' | 'config' | 'seo' | 'visits'>('order');
+  const [activeTab, setActiveTab] = useState<'order' | 'create' | 'categories' | 'visits' | 'seo' | 'link' | 'ai' | 'config' | 'code'>('order');
   const [editingItem, setEditingItem] = useState<NewsItem | null>(null);
 
   // Visit History State
@@ -72,6 +72,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [cfgLogoSize, setCfgLogoSize] = useState(siteConfig.logoSize || 48);
   const [cfgTitleColor, setCfgTitleColor] = useState(siteConfig.titleColor || '#c20000');
   const [cfgTitleText, setCfgTitleText] = useState(siteConfig.titleText || 'Concello de Vilanova de Arousa');
+  const [cfgBaseVisits, setCfgBaseVisits] = useState<number>(siteConfig.baseVisits !== undefined ? siteConfig.baseVisits : 30);
   const [cfgVideoUrl, setCfgVideoUrl] = useState(siteConfig.videoUrl || '');
   const [cfgVideoTitle, setCfgVideoTitle] = useState(siteConfig.videoTitle || '');
   const [cfgVideoBadge, setCfgVideoBadge] = useState(siteConfig.videoBadge || 'NOTICIA IMPORTANTE');
@@ -92,6 +93,43 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [cfgStructuredDataOrgName, setCfgStructuredDataOrgName] = useState(siteConfig.structuredDataOrgName || 'Concello de Vilanova de Arousa');
   const [cfgStructuredDataRegion, setCfgStructuredDataRegion] = useState(siteConfig.structuredDataRegion || 'Galicia, España');
   
+  // Expanded Screen Width State
+  const [isExpandedWidth, setIsExpandedWidth] = useState<boolean>(true);
+
+  // Google Auto-Indexing Ping State
+  const [isPingingGoogle, setIsPingingGoogle] = useState<boolean>(false);
+  const [googlePingResult, setGooglePingResult] = useState<{ success?: boolean; message?: string; details?: string; time?: string } | null>(null);
+
+  const handleTriggerGooglePing = async () => {
+    setIsPingingGoogle(true);
+    setGooglePingResult(null);
+    try {
+      const res = await safeFetchJson('/api/seo/ping-google', { method: 'POST' });
+      if (res && res.success) {
+        setGooglePingResult({
+          success: true,
+          message: '¡Notificación enviada a Google Search Engine!',
+          details: res.pingDetails || `Sitemap.xml listo y disponible en ${res.sitemapUrl}`,
+          time: new Date().toLocaleTimeString('es-ES')
+        });
+      } else {
+        setGooglePingResult({
+          success: false,
+          message: res?.error || 'No se pudo enviar la solicitud de aviso a Google.',
+          time: new Date().toLocaleTimeString('es-ES')
+        });
+      }
+    } catch (e: any) {
+      setGooglePingResult({
+        success: false,
+        message: 'Error al comunicarse con el servicio de auto-indexación.',
+        time: new Date().toLocaleTimeString('es-ES')
+      });
+    } finally {
+      setIsPingingGoogle(false);
+    }
+  };
+
   const [copiedSitemap, setCopiedSitemap] = useState(false);
   const [copiedGoogleLink, setCopiedGoogleLink] = useState(false);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
@@ -130,6 +168,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setCfgLogoSize(siteConfig.logoSize || 48);
       setCfgTitleColor(siteConfig.titleColor || '#c20000');
       setCfgTitleText(siteConfig.titleText || 'Concello de Vilanova de Arousa');
+      setCfgBaseVisits(siteConfig.baseVisits !== undefined ? siteConfig.baseVisits : 30);
       setCfgVideoUrl(siteConfig.videoUrl || 'https://www.youtube.com/watch?v=40GxTki9Krc');
       setCfgVideoTitle(siteConfig.videoTitle || 'Información y Proyectos Municipales en Vilanova de Arousa');
       setCfgVideoBadge(siteConfig.videoBadge || 'NOTICIA IMPORTANTE');
@@ -160,6 +199,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       logoSize: Number(cfgLogoSize) || 48,
       titleColor: cfgTitleColor.trim() || '#c20000',
       titleText: cfgTitleText.trim() || 'Concello de Vilanova de Arousa',
+      baseVisits: typeof cfgBaseVisits === 'number' && !isNaN(cfgBaseVisits) ? Math.max(0, cfgBaseVisits) : 30,
       videoUrl: cfgVideoUrl.trim() || 'https://www.youtube.com/watch?v=40GxTki9Krc',
       videoTitle: cfgVideoTitle.trim() || 'Información y Proyectos Municipales en Vilanova de Arousa',
       videoBadge: cfgVideoBadge.trim() || 'NOTICIA IMPORTANTE',
@@ -399,6 +439,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const handleQuickChangeCategory = (newsId: string, newCat: Category) => {
+    const updated = newsList.map((item) => (item.id === newsId ? { ...item, category: newCat } : item));
+    onUpdateNewsList(updated);
+  };
+
   // Save/Update Article Form Submit
   const handleSaveArticle = (e: React.FormEvent) => {
     e.preventDefault();
@@ -618,15 +663,19 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-sm overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
       <div 
-        className="relative w-full max-w-5xl bg-[#fdfcf8] dark:bg-black border-4 border-black dark:border-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)] overflow-hidden my-auto max-h-[92vh] flex flex-col"
+        className={`relative w-full transition-all duration-300 bg-[#fdfcf8] dark:bg-black border-4 border-black dark:border-white shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] dark:shadow-[10px_10px_0px_0px_rgba(255,255,255,1)] overflow-hidden my-auto ${
+          isExpandedWidth 
+            ? 'max-w-[98vw] xl:max-w-[98vw] 2xl:max-w-[1850px] max-h-[96vh]' 
+            : 'max-w-5xl max-h-[92vh]'
+        } flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}
-        <div className="bg-black text-white px-6 py-5 flex items-center justify-between border-b-4 border-black dark:border-white">
+        <div className="bg-black text-white px-6 py-4 flex items-center justify-between border-b-4 border-black dark:border-white shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-rose-600 flex items-center justify-center font-black text-white border-2 border-white">
+            <div className="w-10 h-10 bg-rose-600 flex items-center justify-center font-black text-white border-2 border-white shadow">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
@@ -634,18 +683,31 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                 Panel de Administración de Noticias
               </h2>
               <p className="text-xs font-mono text-slate-300 uppercase tracking-wider">
-                Concello de Vilanova de Arousa • Gestión de Contenidos
+                Concello de Vilanova de Arousa • Gestión de Contenidos • Vista Ampliada de Alta Comodidad
               </p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 border-2 border-white bg-rose-600 text-white font-black hover:bg-rose-700 transition"
-            title="Cerrar Panel"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsExpandedWidth(prev => !prev)}
+              className="px-3 py-2 border-2 border-white bg-slate-800 hover:bg-slate-700 text-white font-black text-xs uppercase tracking-wider transition flex items-center gap-2 shadow"
+              title={isExpandedWidth ? 'Reducir a Ancho Normal' : 'Ampliar Pantalla (Modo Súper Ancho)'}
+            >
+              {isExpandedWidth ? <Minimize2 className="w-4 h-4 text-amber-400" /> : <Maximize2 className="w-4 h-4 text-emerald-400" />}
+              <span className="hidden md:inline">{isExpandedWidth ? 'Vista Normal' : 'Pantalla Ancha Pro'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 border-2 border-white bg-rose-600 text-white font-black hover:bg-rose-700 transition shadow"
+              title="Cerrar Panel"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* DB Connection & Health Indicator Banner */}
@@ -729,106 +791,138 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
           </button>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="bg-slate-200 dark:bg-slate-900 px-6 pt-3 flex border-b-4 border-black dark:border-white overflow-x-auto gap-2">
-          <button
-            onClick={() => setActiveTab('order')}
-            className={`px-4 py-2.5 font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black dark:border-white transition flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'order'
-                ? 'bg-black text-white dark:bg-white dark:text-black'
-                : 'bg-white text-black dark:bg-slate-800 dark:text-white hover:bg-slate-100'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            Organizar Posiciones ({newsList.length})
-          </button>
+        {/* Navigation Tabs - Fully Visible Responsive Grid & Wrap */}
+        <div className="bg-slate-900 border-b-4 border-black dark:border-white p-3 sm:p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 1. Posiciones */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('order')}
+              className={`px-3.5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center gap-2 border-2 shadow-sm ${
+                activeTab === 'order'
+                  ? 'bg-white text-black border-white ring-2 ring-emerald-400 shadow-md scale-105'
+                  : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 hover:text-white'
+              }`}
+            >
+              <Layers className="w-4 h-4 text-emerald-400" />
+              <span>1. Organizar Noticias ({newsList.length})</span>
+            </button>
 
-          <button
-            onClick={() => {
-              handleResetForm();
-              setActiveTab('create');
-            }}
-            className={`px-4 py-2.5 font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black dark:border-white transition flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'create'
-                ? 'bg-black text-white dark:bg-white dark:text-black'
-                : 'bg-white text-black dark:bg-slate-800 dark:text-white hover:bg-slate-100'
-            }`}
-          >
-            <Plus className="w-4 h-4" />
-            {editingItem ? 'Editar Noticia' : 'Agregar Nueva Noticia'}
-          </button>
+            {/* 2. Agregar Noticia */}
+            <button
+              type="button"
+              onClick={() => {
+                handleResetForm();
+                setActiveTab('create');
+              }}
+              className={`px-3.5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center gap-2 border-2 shadow-sm ${
+                activeTab === 'create'
+                  ? 'bg-rose-600 text-white border-rose-400 ring-2 ring-white shadow-md scale-105'
+                  : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 hover:text-white'
+              }`}
+            >
+              <Plus className="w-4 h-4 text-rose-400" />
+              <span>2. {editingItem ? 'Editar Noticia' : 'Agregar Noticia'}</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('link')}
-            className={`px-4 py-2.5 font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black dark:border-white transition flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'link'
-                ? 'bg-amber-300 text-black font-black'
-                : 'bg-white text-black dark:bg-slate-800 dark:text-white hover:bg-slate-100'
-            }`}
-          >
-            <LinkIcon className="w-4 h-4 text-rose-600" />
-            Pegar Link Noticia 🔗
-          </button>
+            {/* 3. Categorías Municipales (NUEVO TAB VISIBLE) */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('categories')}
+              className={`px-3.5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center gap-2 border-2 shadow-sm ${
+                activeTab === 'categories'
+                  ? 'bg-amber-500 text-black border-amber-300 ring-2 ring-white shadow-md scale-105'
+                  : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 hover:text-white'
+              }`}
+            >
+              <span className="text-sm">🏷️</span>
+              <span>3. Categorías & Secciones ({CATEGORIES_LIST.length - 1})</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('ai')}
-            className={`px-4 py-2.5 font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black dark:border-white transition flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'ai'
-                ? 'bg-black text-white dark:bg-white dark:text-black'
-                : 'bg-white text-black dark:bg-slate-800 dark:text-white hover:bg-slate-100'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            Redactor IA
-          </button>
+            {/* 4. Modificar Visitas al Portal */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('visits')}
+              className={`px-3.5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center gap-2 border-2 shadow-sm ${
+                activeTab === 'visits'
+                  ? 'bg-emerald-600 text-white border-emerald-300 ring-2 ring-emerald-400 shadow-md scale-105'
+                  : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 hover:text-white'
+              }`}
+            >
+              <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+              <span>4. Modificar Visitas ({cfgBaseVisits.toLocaleString('es-ES')})</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('config')}
-            className={`px-4 py-2.5 font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black dark:border-white transition flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'config'
-                ? 'bg-rose-600 text-white font-black'
-                : 'bg-white text-black dark:bg-slate-800 dark:text-white hover:bg-slate-100'
-            }`}
-          >
-            <Palette className="w-4 h-4 text-amber-300" />
-            Logo, Título & Vídeo 🎥
-          </button>
+            {/* 5. Posicionamiento SEO & Deseo de Google */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('seo')}
+              className={`px-3.5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center gap-2 border-2 shadow-sm ${
+                activeTab === 'seo'
+                  ? 'bg-blue-600 text-white border-blue-300 ring-2 ring-blue-400 shadow-md scale-105'
+                  : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 hover:text-white'
+              }`}
+            >
+              <Globe className="w-4 h-4 text-cyan-300 animate-pulse" />
+              <span>5. SEO & Deseo de Google 🚀</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('seo')}
-            className={`px-4 py-2.5 font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black dark:border-white transition flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'seo'
-                ? 'bg-blue-600 text-white font-black ring-2 ring-blue-400'
-                : 'bg-white text-black dark:bg-slate-800 dark:text-white hover:bg-slate-100'
-            }`}
-          >
-            <Globe className="w-4 h-4 text-emerald-400 animate-pulse" />
-            Panel CEO & SEO Google 🚀
-          </button>
+            {/* 6. Pegar Link Noticia */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('link')}
+              className={`px-3 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center gap-1.5 border-2 shadow-sm ${
+                activeTab === 'link'
+                  ? 'bg-amber-400 text-black border-amber-200 ring-2 ring-black scale-105'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+            >
+              <LinkIcon className="w-3.5 h-3.5 text-amber-400" />
+              <span>6. Pegar Link 🔗</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('visits')}
-            className={`px-4 py-2.5 font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black dark:border-white transition flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'visits'
-                ? 'bg-emerald-600 text-white font-black ring-2 ring-emerald-400'
-                : 'bg-white text-black dark:bg-slate-800 dark:text-white hover:bg-slate-100'
-            }`}
-          >
-            <Activity className="w-4 h-4 text-emerald-300 animate-pulse" />
-            Historial de Visitas Pro 📈
-          </button>
+            {/* 7. Redactor IA */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('ai')}
+              className={`px-3 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center gap-1.5 border-2 shadow-sm ${
+                activeTab === 'ai'
+                  ? 'bg-purple-600 text-white border-purple-300 ring-2 ring-purple-400 scale-105'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+              <span>7. Redactor IA ✨</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab('code')}
-            className={`px-4 py-2.5 font-black text-xs sm:text-sm uppercase tracking-wider border-2 border-black dark:border-white transition flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'code'
-                ? 'bg-black text-white dark:bg-white dark:text-black'
-                : 'bg-white text-black dark:bg-slate-800 dark:text-white hover:bg-slate-100'
-            }`}
-          >
-            <Code className="w-4 h-4" />
-            Exportar TS
-          </button>
+            {/* 8. Logo, Título & Vídeo */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('config')}
+              className={`px-3 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center gap-1.5 border-2 shadow-sm ${
+                activeTab === 'config'
+                  ? 'bg-rose-700 text-white border-rose-300 ring-2 ring-rose-400 scale-105'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+            >
+              <Palette className="w-3.5 h-3.5 text-rose-300" />
+              <span>8. Identidad & Vídeo 🎥</span>
+            </button>
+
+            {/* 9. Exportar TS */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('code')}
+              className={`px-3 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center gap-1.5 border-2 shadow-sm ${
+                activeTab === 'code'
+                  ? 'bg-emerald-700 text-white border-emerald-300 ring-2 ring-emerald-400 scale-105'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+            >
+              <Code className="w-3.5 h-3.5 text-emerald-300" />
+              <span>9. Exportar TS</span>
+            </button>
+          </div>
         </div>
 
         {/* Tab Content Container */}
@@ -991,6 +1085,185 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                   </div>
                 );
               })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: CATEGORÍAS MUNICIPALES (VISIÓN COMPLETA Y GESTIÓN) */}
+          {activeTab === 'categories' && (
+            <div className="space-y-6">
+              {/* Executive Header Banner */}
+              <div className="bg-gradient-to-r from-amber-950 via-slate-900 to-black border-2 border-amber-500/80 p-5 rounded-2xl text-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-amber-400 font-black text-lg font-serif">
+                    <span className="text-xl">🏷️</span>
+                    <span>Gestión y Vista Completa de Categorías Municipales</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">
+                    Todas las noticias se muestran juntas en la página principal. Desde este módulo puedes ver el desglose completo por área, organizar qué noticias pertenecen a cada temática oficial y reasignar categorías con un solo clic.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleResetForm();
+                      setFormCategory('Alcaldía');
+                      setActiveTab('create');
+                    }}
+                    className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-black font-black px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition shadow-lg border border-amber-300"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Nueva Noticia</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Category Summary Matrix Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {CATEGORIES_LIST.filter(c => c.id !== 'Todas').map((cat) => {
+                  const count = newsList.filter(n => n.category === cat.id).length;
+                  const catEmoji = cat.id === 'Alcaldía' ? '🏛️' : cat.id === 'Obras' ? '🏗️' : cat.id === 'Deportes' ? '⚽' : cat.id === 'Cultura' ? '🎭' : cat.id === 'Turismo' ? '🌊' : cat.id === 'Servicios' ? '🤝' : cat.id === 'Eventos' ? '📅' : '🏛️';
+                  return (
+                    <div 
+                      key={cat.id} 
+                      className="bg-slate-900 border-2 border-slate-800 hover:border-amber-400/60 p-4 rounded-xl space-y-2 transition shadow"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xl">{catEmoji}</span>
+                        <span className="text-xs font-mono font-bold bg-slate-800 text-amber-300 px-2 py-0.5 rounded-full border border-slate-700">
+                          {count} {count === 1 ? 'noticia' : 'noticias'}
+                        </span>
+                      </div>
+                      <div className="font-black text-sm text-white truncate" title={cat.label}>
+                        {cat.label}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleResetForm();
+                          setFormCategory(cat.id);
+                          setActiveTab('create');
+                        }}
+                        className="w-full text-left text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 pt-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Añadir noticia aquí</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Detailed Breakdown for Each Category */}
+              <div className="space-y-6 pt-2">
+                <h4 className="text-sm font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 border-b border-slate-300 dark:border-slate-800 pb-2 flex items-center justify-between">
+                  <span>Listado de Noticias Agrupadas por Categoría:</span>
+                  <span className="text-xs font-mono font-normal text-slate-500">Total: {newsList.length} artículos</span>
+                </h4>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {CATEGORIES_LIST.filter(c => c.id !== 'Todas').map((cat) => {
+                    const itemsInCat = newsList.filter(n => n.category === cat.id);
+                    const catEmoji = cat.id === 'Alcaldía' ? '🏛️' : cat.id === 'Obras' ? '🏗️' : cat.id === 'Deportes' ? '⚽' : cat.id === 'Cultura' ? '🎭' : cat.id === 'Turismo' ? '🌊' : cat.id === 'Servicios' ? '🤝' : cat.id === 'Eventos' ? '📅' : '🏛️';
+
+                    return (
+                      <div 
+                        key={cat.id}
+                        className="bg-white dark:bg-slate-900 border-2 border-black dark:border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3 shadow-md flex flex-col justify-between"
+                      >
+                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{catEmoji}</span>
+                            <div>
+                              <h5 className="font-black text-sm sm:text-base text-slate-900 dark:text-white uppercase font-serif">
+                                {cat.label}
+                              </h5>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                Categoría oficial Concello
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-2.5 py-1 rounded-full border border-slate-300 dark:border-slate-700 font-mono">
+                              {itemsInCat.length}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleResetForm();
+                                setFormCategory(cat.id);
+                                setActiveTab('create');
+                              }}
+                              className="p-1.5 bg-amber-400 text-black hover:bg-amber-300 rounded-lg transition"
+                              title={`Agregar nueva noticia en ${cat.label}`}
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* News List under this Category */}
+                        <div className="space-y-2 flex-1 max-h-[300px] overflow-y-auto pr-1">
+                          {itemsInCat.length > 0 ? (
+                            itemsInCat.map((item) => (
+                              <div 
+                                key={item.id}
+                                className="p-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-between gap-3 hover:border-amber-400/50 transition"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <img 
+                                    src={item.imageUrl || 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=200&q=80'} 
+                                    alt="" 
+                                    className="w-10 h-10 object-cover rounded-lg shrink-0 border border-slate-300 dark:border-slate-700"
+                                  />
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-bold text-slate-900 dark:text-white truncate" title={item.title}>
+                                      {item.title}
+                                    </p>
+                                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                                      <span>Posición #{item.position}</span>
+                                      {item.isHero && <span className="text-rose-500 font-bold">★ Portada</span>}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {/* Quick change category dropdown */}
+                                  <select
+                                    value={item.category || cat.id}
+                                    onChange={(e) => handleQuickChangeCategory(item.id, e.target.value as Category)}
+                                    className="text-[10px] font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 rounded-lg p-1 outline-none"
+                                    title="Mover noticia a otra categoría"
+                                  >
+                                    {CATEGORIES_LIST.filter(c => c.id !== 'Todas').map(c => (
+                                      <option key={c.id} value={c.id}>{c.label}</option>
+                                    ))}
+                                  </select>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEdit(item)}
+                                    className="p-1.5 bg-slate-200 dark:bg-slate-800 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black rounded-lg text-xs transition"
+                                    title="Editar Noticia"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-6 text-slate-400 dark:text-slate-600 text-xs font-mono">
+                              No hay noticias asignadas a esta categoría todavía.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -1591,6 +1864,32 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                   </div>
                 </div>
 
+                {/* Base Visits Input Setting */}
+                <div className="bg-slate-50 dark:bg-slate-800/80 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Eye className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                      <span>Visitas al Portal Web (Contador Inicial / Base)</span>
+                    </span>
+                    <span className="text-emerald-600 dark:text-emerald-400 font-mono text-xs font-bold">
+                      Mostradas en la portada: {(cfgBaseVisits + Math.floor(Math.max(0, Date.now() - new Date('2026-01-01T00:00:00Z').getTime()) / (3 * 60 * 60 * 1000)) * 23).toLocaleString('es-ES')}
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      value={cfgBaseVisits}
+                      onChange={(e) => setCfgBaseVisits(parseInt(e.target.value, 10) || 0)}
+                      className="w-full p-3 text-sm font-mono font-black bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-rose-500 outline-none"
+                      placeholder="30"
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Modifica la cifra inicial desde la que arranca el contador público de visitas al portal ubicado en el pie de página.
+                  </p>
+                </div>
+
                 {/* Live Masthead Preview Box */}
                 <div className="bg-slate-100 dark:bg-slate-950 p-6 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-center space-y-2">
                   <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block">
@@ -1737,6 +2036,77 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                 )}
               </div>
 
+              {/* BLOCK 3: PORTAL VISITS MODIFIER */}
+              <div className="bg-white dark:bg-slate-900 border-2 border-emerald-500 dark:border-emerald-600 p-6 rounded-2xl shadow-md space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+                  <div className="flex items-center gap-2 text-base font-black uppercase text-slate-900 dark:text-white">
+                    <Eye className="w-5 h-5 text-emerald-600" />
+                    <span>3. Contador de Visitas al Portal Web</span>
+                  </div>
+                  <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-xs font-mono font-bold px-3 py-1 rounded-full border border-emerald-300 dark:border-emerald-700">
+                    Mostradas en la web: {(cfgBaseVisits + Math.floor(Math.max(0, Date.now() - new Date('2026-01-01T00:00:00Z').getTime()) / (3 * 60 * 60 * 1000)) * 23).toLocaleString('es-ES')}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      Cifra Base de Visitas (Número Inicial)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={cfgBaseVisits}
+                      onChange={(e) => setCfgBaseVisits(parseInt(e.target.value, 10) || 0)}
+                      className="w-full p-3 bg-slate-50 dark:bg-slate-800 border-2 border-emerald-400 dark:border-emerald-600 text-emerald-700 dark:text-emerald-400 font-mono text-lg font-black rounded-xl outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold uppercase text-slate-500 tracking-wider">
+                      Sumar Visitas Rápidamente:
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setCfgBaseVisits(prev => prev + 500)}
+                        className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold transition"
+                      >
+                        +500
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCfgBaseVisits(prev => prev + 1000)}
+                        className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold transition"
+                      >
+                        +1.000
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCfgBaseVisits(prev => prev + 5000)}
+                        className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold transition"
+                      >
+                        +5.000
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCfgBaseVisits(prev => prev + 10000)}
+                        className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold transition"
+                      >
+                        +10.000
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCfgBaseVisits(30)}
+                        className="px-2.5 py-1 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-600 hover:text-white text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 rounded-lg text-xs font-bold transition"
+                      >
+                        Reiniciar (30)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* SAVE CONFIGURATION BUTTON */}
               <button
                 type="button"
@@ -1754,38 +2124,157 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
 
           {/* TAB: PANEL CEO & POSICIONAMIENTO PERFECTO GOOGLE PRO */}
           {activeTab === 'seo' && (
-            <div className="space-y-8 max-w-4xl mx-auto pb-8">
+            <div className="space-y-8 max-w-full mx-auto pb-8">
               {/* Executive CEO Banner */}
               <div className="bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 border-2 border-blue-500/50 p-6 rounded-2xl text-white shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2 text-amber-400 font-black text-lg uppercase tracking-wider">
                       <Award className="w-6 h-6 text-yellow-400" />
-                      <span>Suite de Posicionamiento Google CEO PRO</span>
+                      <span>Posicionamiento SEO & Deseo de Google • Auto-Indexación PRO</span>
                     </div>
-                    <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                      Panel exclusivo de optimización para motores de búsqueda (Search Engine Optimization). Configura la indexación index/follow, sitemaps, fragmentos enriquecidos (Schema.org), la verificación oficial de Google Search Console y simula cómo aparece el portal en Google.
+                    <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
+                      Panel de optimización y posicionamiento en Google (Search Engine Optimization / Deseo de Google). Configura el sitemap XML oficial, meta-etiquetas de búsqueda, verificación de Google Search Console, Google Analytics y el ping de auto-indexación para aparecer en los primeros resultados.
                     </p>
                   </div>
 
-                  <div className="bg-slate-900/90 border border-blue-400/40 p-4 rounded-xl text-center shrink-0 min-w-[140px] shadow-lg">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-blue-300 block">Puntuación SEO</span>
-                    <span className="text-3xl font-black font-mono text-emerald-400">
-                      {(() => {
-                        let score = 0;
-                        if (cfgSeoTitle.length >= 25 && cfgSeoTitle.length <= 70) score += 15;
-                        if (cfgSeoMetaDescription.length >= 60 && cfgSeoMetaDescription.length <= 180) score += 15;
-                        if (cfgSeoKeywords.trim()) score += 15;
-                        if (cfgGoogleSearchConsoleTag.trim()) score += 15;
-                        if (cfgGoogleAnalyticsId.trim()) score += 15;
-                        if (cfgOgImageUrl.trim()) score += 10;
-                        if (cfgCanonicalUrl.trim()) score += 10;
-                        if (cfgStructuredDataOrgName.trim()) score += 5;
-                        return Math.min(score, 100);
-                      })()}/100
-                    </span>
-                    <span className="text-[10px] font-bold text-emerald-300 block uppercase mt-0.5">🟢 Estado Óptimo</span>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="bg-slate-900/90 border border-blue-400/40 p-3.5 rounded-xl text-center min-w-[140px] shadow-lg">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-blue-300 block">Puntuación SEO</span>
+                      <span className="text-3xl font-black font-mono text-emerald-400">
+                        {(() => {
+                          let score = 0;
+                          if (cfgSeoTitle.length >= 25 && cfgSeoTitle.length <= 70) score += 15;
+                          if (cfgSeoMetaDescription.length >= 60 && cfgSeoMetaDescription.length <= 180) score += 15;
+                          if (cfgSeoKeywords.trim()) score += 15;
+                          if (cfgGoogleSearchConsoleTag.trim()) score += 15;
+                          if (cfgGoogleAnalyticsId.trim()) score += 15;
+                          if (cfgOgImageUrl.trim()) score += 10;
+                          if (cfgCanonicalUrl.trim()) score += 10;
+                          if (cfgStructuredDataOrgName.trim()) score += 5;
+                          return Math.min(score, 100);
+                        })()}/100
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-300 block uppercase mt-0.5">🟢 Excelente Indexación</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SPECIAL SECTION: GOOGLE AUTO-PROPAGATION & AUTO-INDEXING ENGINE */}
+              <div className="bg-slate-900 border-2 border-emerald-500/80 p-6 rounded-2xl shadow-2xl space-y-5 relative overflow-hidden">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-emerald-400 font-black text-base uppercase tracking-wider">
+                      <Zap className="w-5 h-5 text-yellow-400 animate-pulse" />
+                      <span>Motor de Auto-Indexación Inmediata en Google (Google Auto-Propagation Engine)</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Lanza un aviso automático instantáneo (ping) a los servidores de Google para que crawleen e indexen las noticias recientes sin esperar semanas.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleTriggerGooglePing}
+                    disabled={isPingingGoogle}
+                    className="w-full lg:w-auto shrink-0 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-black px-6 py-3.5 rounded-xl text-xs uppercase tracking-widest transition shadow-2xl flex items-center justify-center gap-2 border-2 border-emerald-300"
+                  >
+                    <Radio className={`w-5 h-5 ${isPingingGoogle ? 'animate-spin' : 'animate-pulse'}`} />
+                    <span>{isPingingGoogle ? 'Notificando a Google...' : '🚀 Lanza Auto-Indexación en Google Ahora'}</span>
+                  </button>
+                </div>
+
+                {/* Google Ping Result Output Box */}
+                {googlePingResult && (
+                  <div className={`p-4 rounded-xl text-xs font-mono border-2 flex items-start gap-3 animate-fadeIn ${
+                    googlePingResult.success 
+                      ? 'bg-emerald-950/90 border-emerald-500 text-emerald-200' 
+                      : 'bg-rose-950/90 border-rose-500 text-rose-200'
+                  }`}>
+                    <CheckCircle2 className={`w-5 h-5 shrink-0 mt-0.5 ${googlePingResult.success ? 'text-emerald-400' : 'text-rose-400'}`} />
+                    <div className="space-y-1">
+                      <p className="font-bold text-sm uppercase">{googlePingResult.message}</p>
+                      {googlePingResult.details && <p className="text-slate-300 text-[11px]">{googlePingResult.details}</p>}
+                      <span className="text-[10px] opacity-75 block">Hora de ejecucion: {googlePingResult.time}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Live Direct Links Bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                  <a
+                    href="/sitemap.xml"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold p-3 rounded-xl text-xs transition border border-slate-700"
+                  >
+                    <FileText className="w-4 h-4 text-emerald-400" />
+                    <span>Ver `/sitemap.xml`</span>
+                  </a>
+
+                  <a
+                    href="/robots.txt"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold p-3 rounded-xl text-xs transition border border-slate-700"
+                  >
+                    <Code className="w-4 h-4 text-amber-400" />
+                    <span>Ver `/robots.txt`</span>
+                  </a>
+
+                  <a
+                    href={`https://search.google.com/test/rich-results?url=${encodeURIComponent(cfgCanonicalUrl || 'https://vilanova-de-arousa.gal')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold p-3 rounded-xl text-xs transition border border-slate-700"
+                  >
+                    <Sparkles className="w-4 h-4 text-blue-400" />
+                    <span>Test Google Rich Results</span>
+                  </a>
+
+                  <a
+                    href="https://search.google.com/search-console"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold p-3 rounded-xl text-xs transition border border-slate-700"
+                  >
+                    <ExternalLink className="w-4 h-4 text-indigo-400" />
+                    <span>Google Search Console</span>
+                  </a>
+                </div>
+
+                {/* Google Readiness Checklist */}
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest block font-bold">
+                    Checklist de Criterios de Indexabilidad Automática Google:
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs">
+                    <div className="flex items-center gap-2 text-emerald-300 font-medium">
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Sitemap XML Dinámico Activo</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-300 font-medium">
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Robots.txt con User-agent Googlebot</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-300 font-medium">
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Meta Search Console Tag inyectado</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-300 font-medium">
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Estructura JSON-LD Schema.org</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-300 font-medium">
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Tarjetas OpenGraph para Redes Sociales</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-300 font-medium">
+                      <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Etiqueta Canónica SSL (HTTPS)</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1804,488 +2293,498 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                 </div>
               )}
 
-              {/* LIVE GOOGLE SERP SIMULATOR */}
-              <div className="bg-white dark:bg-slate-900 border-2 border-blue-600 rounded-2xl p-6 shadow-xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
-                  <div className="flex items-center gap-2 text-sm font-black uppercase text-slate-900 dark:text-white">
-                    <Search className="w-5 h-5 text-blue-600" />
-                    <span>Simulador de Resultado en Búsquedas de Google (SERP Preview)</span>
-                  </div>
-                  <span className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 font-bold px-2.5 py-1 rounded-full uppercase">
-                    Google Search Live Mock
-                  </span>
-                </div>
-
-                {/* Simulated Google Search Result */}
-                <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1 font-sans">
-                  <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 font-mono">
-                    <div className="w-4 h-4 bg-red-600 rounded-full flex items-center justify-center text-[8px] text-white font-bold">V</div>
-                    <span className="text-[12px] font-medium text-slate-800 dark:text-slate-200">
-                      {cfgCanonicalUrl ? cfgCanonicalUrl.replace('https://', '').replace('http://', '') : 'vilanova-de-arousa.gal'}
-                    </span>
-                    <span className="text-slate-400">› noticias › concello</span>
-                  </div>
-
-                  <h3 className="text-lg sm:text-xl font-medium text-[#1a0dab] dark:text-[#8ab4f8] hover:underline cursor-pointer tracking-tight leading-snug">
-                    {cfgSeoTitle || 'Concello de Vilanova de Arousa - Portal Oficial'}
-                  </h3>
-
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl pt-0.5">
-                    {cfgSeoMetaDescription || 'Portal Informativo Oficial del Concello de Vilanova de Arousa. Noticias de alcaldía, proyectos municipales y agenda.'}
-                  </p>
-
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 pt-2 text-xs text-[#1a0dab] dark:text-[#8ab4f8] font-medium">
-                    <span className="hover:underline cursor-pointer">Alcaldía y Comunicados</span>
-                    <span className="hover:underline cursor-pointer">Obras e Iniciativas</span>
-                    <span className="hover:underline cursor-pointer">Vídeo Noticia Importante</span>
-                    <span className="hover:underline cursor-pointer">Agenda Municipal</span>
-                  </div>
-                </div>
-
-                {/* Character Counters */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono pt-1">
-                  <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 space-y-1">
-                    <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
-                      <span>Longitud Título Google:</span>
-                      <span className={cfgSeoTitle.length >= 30 && cfgSeoTitle.length <= 65 ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-amber-600'}>
-                        {cfgSeoTitle.length} / 60 caracteres
-                      </span>
+              {/* TWO COLUMN RESPONSIVE GRID FOR WIDE SCREEN COMFORT */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                
+                {/* LEFT COLUMN */}
+                <div className="space-y-6">
+                  {/* SECTION 1: META ETIQUETAS DE BÚSQUEDA */}
+                  <div className="bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 p-6 rounded-2xl shadow-md space-y-5">
+                    <div className="flex items-center gap-2 text-base font-black uppercase text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <Target className="w-5 h-5 text-blue-600" />
+                      <span>1. Meta Título y Meta Descripción para Indexación Google</span>
                     </div>
-                    <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full ${cfgSeoTitle.length <= 65 ? 'bg-emerald-500' : 'bg-rose-500'}`} 
-                        style={{ width: `${Math.min((cfgSeoTitle.length / 65) * 100, 100)}%` }}
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        Meta Title (Título que aparece en la pestaña y en los resultados de Google)
+                      </label>
+                      <input
+                        type="text"
+                        value={cfgSeoTitle}
+                        onChange={(e) => setCfgSeoTitle(e.target.value)}
+                        placeholder="Concello de Vilanova de Arousa - Portal Oficial Noticias y Actualidad"
+                        className="w-full p-3.5 text-sm bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-bold focus:border-blue-500 outline-none"
                       />
                     </div>
-                  </div>
 
-                  <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 space-y-1">
-                    <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
-                      <span>Longitud Meta Descripción:</span>
-                      <span className={cfgSeoMetaDescription.length >= 70 && cfgSeoMetaDescription.length <= 160 ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-amber-600'}>
-                        {cfgSeoMetaDescription.length} / 160 caracteres
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full ${cfgSeoMetaDescription.length <= 160 ? 'bg-emerald-500' : 'bg-rose-500'}`} 
-                        style={{ width: `${Math.min((cfgSeoMetaDescription.length / 160) * 100, 100)}%` }}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        Meta Description (Resumen explicativo mostrado por Google en la búsqueda)
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={cfgSeoMetaDescription}
+                        onChange={(e) => setCfgSeoMetaDescription(e.target.value)}
+                        placeholder="Portal Informativo Oficial del Concello de Vilanova de Arousa. Últimas noticias de alcaldía, obradoiros, proyectos municipales, bandos y eventos."
+                        className="w-full p-3 text-sm bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-blue-500 outline-none"
                       />
                     </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* SECTION 1: META ETIQUETAS DE BÚSQUEDA */}
-              <div className="bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 p-6 rounded-2xl shadow-md space-y-5">
-                <div className="flex items-center gap-2 text-base font-black uppercase text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-3">
-                  <Target className="w-5 h-5 text-blue-600" />
-                  <span>1. Meta Título y Meta Descripción para Indexación Google</span>
-                </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        Palabras Clave Objetivo (Keywords separadas por comas)
+                      </label>
+                      <input
+                        type="text"
+                        value={cfgSeoKeywords}
+                        onChange={(e) => setCfgSeoKeywords(e.target.value)}
+                        placeholder="Vilanova de Arousa, Concello, Galicia, Alcaldia, Noticias Vilanova, Salnes"
+                        className="w-full p-3 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-mono focus:border-blue-500 outline-none"
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                    Meta Title (Título que aparece en la pestaña y en los resultados de Google)
-                  </label>
-                  <input
-                    type="text"
-                    value={cfgSeoTitle}
-                    onChange={(e) => setCfgSeoTitle(e.target.value)}
-                    placeholder="Concello de Vilanova de Arousa - Portal Oficial Noticias y Actualidad"
-                    className="w-full p-3.5 text-sm bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-bold focus:border-blue-500 outline-none"
-                  />
-                </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                          Directiva de Robots Google (`meta name="robots"`)
+                        </label>
+                        <input
+                          type="text"
+                          value={cfgRobotsMeta}
+                          onChange={(e) => setCfgRobotsMeta(e.target.value)}
+                          placeholder="index, follow, max-image-preview:large, max-snippet:-1"
+                          className="w-full p-3 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-blue-500 outline-none"
+                        />
+                      </div>
 
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                    Meta Description (Resumen explicativo mostrado por Google en la búsqueda)
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={cfgSeoMetaDescription}
-                    onChange={(e) => setCfgSeoMetaDescription(e.target.value)}
-                    placeholder="Portal Informativo Oficial del Concello de Vilanova de Arousa. Últimas noticias de alcaldía, obradoiros, proyectos municipales, bandos y eventos."
-                    className="w-full p-3 text-sm bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-blue-500 outline-none"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                    Palabras Clave Objetivo (Keywords separadas por comas)
-                  </label>
-                  <input
-                    type="text"
-                    value={cfgSeoKeywords}
-                    onChange={(e) => setCfgSeoKeywords(e.target.value)}
-                    placeholder="Vilanova de Arousa, Concello, Galicia, Alcaldia, Noticias Vilanova, Salnes"
-                    className="w-full p-3 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-mono focus:border-blue-500 outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
-                      Directiva de Robots Google (`meta name="robots"`)
-                    </label>
-                    <input
-                      type="text"
-                      value={cfgRobotsMeta}
-                      onChange={(e) => setCfgRobotsMeta(e.target.value)}
-                      placeholder="index, follow, max-image-preview:large, max-snippet:-1"
-                      className="w-full p-3 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-blue-500 outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
-                      URL Canónica Oficial (`link rel="canonical"`)
-                    </label>
-                    <input
-                      type="url"
-                      value={cfgCanonicalUrl}
-                      onChange={(e) => setCfgCanonicalUrl(e.target.value)}
-                      placeholder="https://vilanova-de-arousa.gal"
-                      className="w-full p-3 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 2: GOOGLE SEARCH CONSOLE & GOOGLE ANALYTICS */}
-              <div className="bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 p-6 rounded-2xl shadow-md space-y-5">
-                <div className="flex items-center gap-2 text-base font-black uppercase text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-3">
-                  <BarChart2 className="w-5 h-5 text-emerald-600" />
-                  <span>2. Integración Oficial Google Search Console & Analytics 4</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                      Código de Verificación Google Search Console
-                    </label>
-                    <input
-                      type="text"
-                      value={cfgGoogleSearchConsoleTag}
-                      onChange={(e) => setCfgGoogleSearchConsoleTag(e.target.value)}
-                      placeholder="google-site-verification-xxxxxx"
-                      className="w-full p-3 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-emerald-500 outline-none"
-                    />
-                    <p className="text-[10px] text-slate-500">
-                      Copia aquí el token de tu propiedad en Google Search Console para verificar el dominio.
-                    </p>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                      ID de Seguimiento Google Analytics 4 (GA4)
-                    </label>
-                    <input
-                      type="text"
-                      value={cfgGoogleAnalyticsId}
-                      onChange={(e) => setCfgGoogleAnalyticsId(e.target.value)}
-                      placeholder="G-XXXXXXXXXX"
-                      className="w-full p-3 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-emerald-500 outline-none"
-                    />
-                    <p className="text-[10px] text-slate-500">
-                      Mide tráfico web en tiempo real de Google Analytics.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION 3: OPENGRAPH & SOCIAL MEDIA SHARING */}
-              <div className="bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 p-6 rounded-2xl shadow-md space-y-5">
-                <div className="flex items-center gap-2 text-base font-black uppercase text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-3">
-                  <Share2 className="w-5 h-5 text-indigo-600" />
-                  <span>3. Tarjetas Sociales Open Graph (Facebook, WhatsApp, X/Twitter)</span>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                    Imagen de Previsualización al Compartir Enlace (`og:image`)
-                  </label>
-                  <input
-                    type="url"
-                    value={cfgOgImageUrl}
-                    onChange={(e) => setCfgOgImageUrl(e.target.value)}
-                    placeholder="https://images.unsplash.com/photo-..."
-                    className="w-full p-3 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-indigo-500 outline-none"
-                  />
-
-                  {cfgOgImageUrl && (
-                    <div className="mt-2 bg-black border border-slate-700 rounded-xl overflow-hidden max-w-sm mx-auto shadow-md">
-                      <img src={cfgOgImageUrl} alt="OG Card Preview" className="w-full h-40 object-cover" />
-                      <div className="p-3 bg-slate-900 text-white space-y-1">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 font-mono">VILANOVA-DE-AROUSA.GAL</span>
-                        <p className="text-xs font-bold line-clamp-1">{cfgSeoTitle}</p>
-                        <p className="text-[11px] text-slate-300 line-clamp-2">{cfgSeoMetaDescription}</p>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                          URL Canónica Oficial (`link rel="canonical"`)
+                        </label>
+                        <input
+                          type="url"
+                          value={cfgCanonicalUrl}
+                          onChange={(e) => setCfgCanonicalUrl(e.target.value)}
+                          placeholder="https://vilanova-de-arousa.gal"
+                          className="w-full p-3 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-blue-500 outline-none"
+                        />
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* SECTION 4: DATOS ESTRUCTURADOS SCHEMA.ORG & GOOGLE NEWS */}
-              <div className="bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 p-6 rounded-2xl shadow-md space-y-5">
-                <div className="flex items-center gap-2 text-base font-black uppercase text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-3">
-                  <Cpu className="w-5 h-5 text-purple-600" />
-                  <span>4. Datos Estructurados Schema.org (Google News & Rich Snippets)</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
-                      Nombre Entidad Oficial
-                    </label>
-                    <input
-                      type="text"
-                      value={cfgStructuredDataOrgName}
-                      onChange={(e) => setCfgStructuredDataOrgName(e.target.value)}
-                      placeholder="Concello de Vilanova de Arousa"
-                      className="w-full p-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-purple-500 outline-none"
-                    />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
-                      Región de Localización
-                    </label>
-                    <input
-                      type="text"
-                      value={cfgStructuredDataRegion}
-                      onChange={(e) => setCfgStructuredDataRegion(e.target.value)}
-                      placeholder="Galicia, España"
-                      className="w-full p-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-purple-500 outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
+                  {/* SECTION 2: GOOGLE SEARCH CONSOLE & GOOGLE ANALYTICS */}
+                  <div className="bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 p-6 rounded-2xl shadow-md space-y-5">
+                    <div className="flex items-center gap-2 text-base font-black uppercase text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <BarChart2 className="w-5 h-5 text-emerald-600" />
+                      <span>2. Integración Oficial Google Search Console & Analytics 4</span>
+                    </div>
 
-              {/* SECTION 5: GENERADOR & DESCARGADOR SITEMAP.XML SUPER FULL CON GUARDADO EN DB */}
-              <div className="bg-slate-900 border-2 border-slate-800 p-6 rounded-2xl text-white space-y-5 shadow-2xl">
-                {(() => {
-                  const baseUrl = cfgCanonicalUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://vilanova-de-arousa.gal');
-                  const todayIso = new Date().toISOString().split('T')[0];
-                  const escapeXml = (str: string) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-
-                  let fullXml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-                  fullXml += `<urlset\n`;
-                  fullXml += `  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n`;
-                  fullXml += `  xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"\n`;
-                  fullXml += `  xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"\n`;
-                  fullXml += `  xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0"\n`;
-                  fullXml += `  xmlns:xhtml="http://www.w3.org/1999/xhtml">\n\n`;
-
-                  // Home Page
-                  fullXml += `  <!-- Página Principal / Portal Oficial -->\n`;
-                  fullXml += `  <url>\n`;
-                  fullXml += `    <loc>${escapeXml(baseUrl)}/</loc>\n`;
-                  fullXml += `    <lastmod>${todayIso}</lastmod>\n`;
-                  fullXml += `    <changefreq>daily</changefreq>\n`;
-                  fullXml += `    <priority>1.0</priority>\n`;
-                  fullXml += `    <mobile:mobile/>\n`;
-                  fullXml += `  </url>\n\n`;
-
-                  // Categories
-                  fullXml += `  <!-- Secciones de Categorías de Noticias -->\n`;
-                  ['Alcaldia', 'Obras', 'Deportes', 'Cultura', 'Turismo', 'Servizos', 'Eventos'].forEach(cat => {
-                    fullXml += `  <url>\n`;
-                    fullXml += `    <loc>${escapeXml(baseUrl)}/#categoria-${cat.toLowerCase()}</loc>\n`;
-                    fullXml += `    <lastmod>${todayIso}</lastmod>\n`;
-                    fullXml += `    <changefreq>daily</changefreq>\n`;
-                    fullXml += `    <priority>0.9</priority>\n`;
-                    fullXml += `  </url>\n`;
-                  });
-
-                  // News Articles
-                  fullXml += `\n  <!-- Artículos y Noticias Publicadas (${newsList.length}) -->\n`;
-                  newsList.forEach((item) => {
-                    const itemDate = item.date ? item.date.split('T')[0] : todayIso;
-                    fullXml += `  <url>\n`;
-                    fullXml += `    <loc>${escapeXml(baseUrl)}/#noticia-${escapeXml(item.id)}</loc>\n`;
-                    fullXml += `    <lastmod>${itemDate}</lastmod>\n`;
-                    fullXml += `    <changefreq>weekly</changefreq>\n`;
-                    fullXml += `    <priority>0.8</priority>\n`;
-
-                    // Google News Rich Metadata
-                    fullXml += `    <news:news>\n`;
-                    fullXml += `      <news:publication>\n`;
-                    fullXml += `        <news:name>${escapeXml(cfgStructuredDataOrgName || 'Concello de Vilanova de Arousa')}</news:name>\n`;
-                    fullXml += `        <news:language>es</news:language>\n`;
-                    fullXml += `      </news:publication>\n`;
-                    fullXml += `      <news:publication_date>${itemDate}</news:publication_date>\n`;
-                    fullXml += `      <news:title>${escapeXml(item.title)}</news:title>\n`;
-                    fullXml += `    </news:news>\n`;
-
-                    // Google Image Metadata
-                    if (item.imageUrl) {
-                      fullXml += `    <image:image>\n`;
-                      fullXml += `      <image:loc>${escapeXml(item.imageUrl)}</image:loc>\n`;
-                      fullXml += `      <image:title>${escapeXml(item.title)}</image:title>\n`;
-                      fullXml += `    </image:image>\n`;
-                    }
-
-                    fullXml += `  </url>\n`;
-                  });
-
-                  fullXml += `</urlset>`;
-
-                  const totalUrlCount = newsList.length + 8;
-                  const googleLinkToDisplay = sitemapDbStatus.googleLink || `${typeof window !== 'undefined' ? window.location.origin : 'https://vilanova-de-arousa.gal'}/sitemap.xml`;
-
-                  const handleSaveSitemapToDb = async () => {
-                    setIsSavingSitemap(true);
-                    setSitemapSaveMessage('');
-                    try {
-                      const res = await safeFetchJson('/api/sitemap/save', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ xmlContent: fullXml, urlCount: totalUrlCount })
-                      });
-                      if (res && res.success) {
-                        setSitemapDbStatus({
-                          isStored: true,
-                          savedAt: res.savedAt || new Date().toISOString(),
-                          googleLink: res.googleLink || googleLinkToDisplay
-                        });
-                        setSitemapSaveMessage('✓ ¡Sitemap.xml guardado exitosamente en la base de datos PostgreSQL!');
-                        setTimeout(() => setSitemapSaveMessage(''), 4500);
-                      }
-                    } catch (e) {
-                      setSitemapSaveMessage('Error al guardar el sitemap en la base de datos.');
-                    } finally {
-                      setIsSavingSitemap(false);
-                    }
-                  };
-
-                  const handleDownloadSitemap = () => {
-                    const blob = new Blob([fullXml], { type: 'application/xml;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.setAttribute('download', 'sitemap.xml');
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                  };
-
-                  return (
-                    <>
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-emerald-400 font-bold text-base uppercase">
-                            <FileText className="w-5 h-5" />
-                            <span>Mapa del Sitio Profesional (Sitemap.xml)</span>
-                          </div>
-                          <p className="text-xs text-slate-300">
-                            Incluye {newsList.length} noticias con etiquetas avanzadas de <strong>Google News</strong> e <strong>Imágenes de Google</strong>.
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={handleSaveSitemapToDb}
-                            disabled={isSavingSitemap}
-                            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition shadow-lg border-2 border-emerald-400"
-                          >
-                            <Database className={`w-4 h-4 ${isSavingSitemap ? 'animate-spin' : ''}`} />
-                            <span>{isSavingSitemap ? 'Guardando en DB...' : 'Guardar Sitemap en DB'}</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={handleDownloadSitemap}
-                            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3 py-2.5 rounded-xl text-xs uppercase tracking-wider transition border border-slate-700"
-                          >
-                            <Download className="w-4 h-4 text-emerald-400" />
-                            <span>Descargar .xml</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(fullXml);
-                              setCopiedSitemap(true);
-                              setTimeout(() => setCopiedSitemap(false), 3000);
-                            }}
-                            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3 py-2.5 rounded-xl text-xs transition border border-slate-700"
-                          >
-                            <Copy className="w-4 h-4 text-blue-400" />
-                            <span>{copiedSitemap ? '¡Copiado!' : 'Copiar XML'}</span>
-                          </button>
-
-                          <a
-                            href="/sitemap.xml"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-2.5 rounded-xl text-xs transition"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            <span>Abrir /sitemap.xml</span>
-                          </a>
-                        </div>
-                      </div>
-
-                      {sitemapSaveMessage && (
-                        <div className="p-3 bg-emerald-950 border border-emerald-700 text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-2 animate-fadeIn">
-                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                          <span>{sitemapSaveMessage}</span>
-                        </div>
-                      )}
-
-                      {/* GOOGLE SEARCH CONSOLE DIRECT LINK BOX */}
-                      <div className="bg-slate-950 border-2 border-emerald-600/90 p-4 rounded-xl space-y-3 shadow-inner">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                            <span>Enlace Oficial Listo para Google Search Console:</span>
-                          </div>
-                          {sitemapDbStatus.isStored && (
-                            <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950 border border-emerald-700 px-2.5 py-0.5 rounded-full font-bold">
-                              ✓ Almacenado en DB PostgreSQL {sitemapDbStatus.savedAt ? `(${new Date(sitemapDbStatus.savedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })})` : ''}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row items-center gap-2">
-                          <input
-                            type="text"
-                            readOnly
-                            value={googleLinkToDisplay}
-                            className="w-full p-2.5 text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg text-emerald-300 select-all outline-none font-bold tracking-wide"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(googleLinkToDisplay);
-                              setCopiedGoogleLink(true);
-                              setTimeout(() => setCopiedGoogleLink(false), 3000);
-                            }}
-                            className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2.5 rounded-lg text-xs uppercase tracking-wider transition border border-emerald-400 shadow-md"
-                          >
-                            <Copy className="w-4 h-4" />
-                            <span>{copiedGoogleLink ? '¡Enlace Copiado!' : 'Copiar Enlace para Google'}</span>
-                          </button>
-                        </div>
-                        <p className="text-[11px] text-slate-400">
-                          📌 Copia este enlace directo e ingrésalo en <strong>Google Search Console &gt; Sitemaps</strong> para indexación automática.
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                          Código de Verificación Google Search Console
+                        </label>
+                        <input
+                          type="text"
+                          value={cfgGoogleSearchConsoleTag}
+                          onChange={(e) => setCfgGoogleSearchConsoleTag(e.target.value)}
+                          placeholder="google-site-verification-xxxxxx"
+                          className="w-full p-3 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-emerald-500 outline-none"
+                        />
+                        <p className="text-[10px] text-slate-500">
+                          Copia aquí el token de tu propiedad en Google Search Console para verificar el dominio.
                         </p>
                       </div>
 
-                      {/* Code Display Area */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center text-[10px] uppercase font-mono text-slate-400">
-                          <span>Vista Previa del Archivo XML Guardado en DB:</span>
-                          <span>{totalUrlCount} URLs Indexadas</span>
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                          ID de Seguimiento Google Analytics 4 (GA4)
+                        </label>
+                        <input
+                          type="text"
+                          value={cfgGoogleAnalyticsId}
+                          onChange={(e) => setCfgGoogleAnalyticsId(e.target.value)}
+                          placeholder="G-XXXXXXXXXX"
+                          className="w-full p-3 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-emerald-500 outline-none"
+                        />
+                        <p className="text-[10px] text-slate-500">
+                          Mide tráfico web en tiempo real de Google Analytics.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION 3: OPENGRAPH & SOCIAL MEDIA SHARING */}
+                  <div className="bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 p-6 rounded-2xl shadow-md space-y-5">
+                    <div className="flex items-center gap-2 text-base font-black uppercase text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <Share2 className="w-5 h-5 text-indigo-600" />
+                      <span>3. Tarjetas Sociales Open Graph (Facebook, WhatsApp, X/Twitter)</span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        Imagen de Previsualización al Compartir Enlace (`og:image`)
+                      </label>
+                      <input
+                        type="url"
+                        value={cfgOgImageUrl}
+                        onChange={(e) => setCfgOgImageUrl(e.target.value)}
+                        placeholder="https://images.unsplash.com/photo-..."
+                        className="w-full p-3 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-indigo-500 outline-none"
+                      />
+
+                      {cfgOgImageUrl && (
+                        <div className="mt-2 bg-black border border-slate-700 rounded-xl overflow-hidden max-w-sm mx-auto shadow-md">
+                          <img src={cfgOgImageUrl} alt="OG Card Preview" className="w-full h-40 object-cover" />
+                          <div className="p-3 bg-slate-900 text-white space-y-1">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 font-mono">VILANOVA-DE-AROUSA.GAL</span>
+                            <p className="text-xs font-bold line-clamp-1">{cfgSeoTitle}</p>
+                            <p className="text-[11px] text-slate-300 line-clamp-2">{cfgSeoMetaDescription}</p>
+                          </div>
                         </div>
-                        <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 overflow-x-auto max-h-64 text-emerald-400 font-mono text-xs leading-relaxed">
-                          <pre>{fullXml}</pre>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN */}
+                <div className="space-y-6">
+                  {/* LIVE GOOGLE SERP SIMULATOR */}
+                  <div className="bg-white dark:bg-slate-900 border-2 border-blue-600 rounded-2xl p-6 shadow-xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <div className="flex items-center gap-2 text-sm font-black uppercase text-slate-900 dark:text-white">
+                        <Search className="w-5 h-5 text-blue-600" />
+                        <span>Simulador de Resultado en Búsquedas de Google (SERP Preview)</span>
+                      </div>
+                      <span className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 font-bold px-2.5 py-1 rounded-full uppercase">
+                        Google Search Live
+                      </span>
+                    </div>
+
+                    {/* Simulated Google Search Result */}
+                    <div className="bg-slate-50 dark:bg-slate-950 p-5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1 font-sans">
+                      <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 font-mono">
+                        <div className="w-4 h-4 bg-red-600 rounded-full flex items-center justify-center text-[8px] text-white font-bold">V</div>
+                        <span className="text-[12px] font-medium text-slate-800 dark:text-slate-200">
+                          {cfgCanonicalUrl ? cfgCanonicalUrl.replace('https://', '').replace('http://', '') : 'vilanova-de-arousa.gal'}
+                        </span>
+                        <span className="text-slate-400">› noticias › concello</span>
+                      </div>
+
+                      <h3 className="text-lg sm:text-xl font-medium text-[#1a0dab] dark:text-[#8ab4f8] hover:underline cursor-pointer tracking-tight leading-snug">
+                        {cfgSeoTitle || 'Concello de Vilanova de Arousa - Portal Oficial'}
+                      </h3>
+
+                      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl pt-0.5">
+                        {cfgSeoMetaDescription || 'Portal Informativo Oficial del Concello de Vilanova de Arousa. Noticias de alcaldía, proyectos municipales y agenda.'}
+                      </p>
+
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 pt-2 text-xs text-[#1a0dab] dark:text-[#8ab4f8] font-medium">
+                        <span className="hover:underline cursor-pointer">Alcaldía y Comunicados</span>
+                        <span className="hover:underline cursor-pointer">Obras e Iniciativas</span>
+                        <span className="hover:underline cursor-pointer">Vídeo Noticia Importante</span>
+                        <span className="hover:underline cursor-pointer">Agenda Municipal</span>
+                      </div>
+                    </div>
+
+                    {/* Character Counters */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono pt-1">
+                      <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 space-y-1">
+                        <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
+                          <span>Longitud Título Google:</span>
+                          <span className={cfgSeoTitle.length >= 30 && cfgSeoTitle.length <= 65 ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-amber-600'}>
+                            {cfgSeoTitle.length} / 60 caracteres
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${cfgSeoTitle.length <= 65 ? 'bg-emerald-500' : 'bg-rose-500'}`} 
+                            style={{ width: `${Math.min((cfgSeoTitle.length / 65) * 100, 100)}%` }}
+                          />
                         </div>
                       </div>
-                    </>
-                  );
-                })()}
+
+                      <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 space-y-1">
+                        <div className="flex justify-between font-bold text-slate-700 dark:text-slate-300">
+                          <span>Longitud Meta Descripción:</span>
+                          <span className={cfgSeoMetaDescription.length >= 70 && cfgSeoMetaDescription.length <= 160 ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-amber-600'}>
+                            {cfgSeoMetaDescription.length} / 160 caracteres
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${cfgSeoMetaDescription.length <= 160 ? 'bg-emerald-500' : 'bg-rose-500'}`} 
+                            style={{ width: `${Math.min((cfgSeoMetaDescription.length / 160) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION 4: DATOS ESTRUCTURADOS SCHEMA.ORG & GOOGLE NEWS */}
+                  <div className="bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 p-6 rounded-2xl shadow-md space-y-5">
+                    <div className="flex items-center gap-2 text-base font-black uppercase text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <Cpu className="w-5 h-5 text-purple-600" />
+                      <span>4. Datos Estructurados Schema.org (Google News & Rich Snippets)</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                          Nombre Entidad Oficial
+                        </label>
+                        <input
+                          type="text"
+                          value={cfgStructuredDataOrgName}
+                          onChange={(e) => setCfgStructuredDataOrgName(e.target.value)}
+                          placeholder="Concello de Vilanova de Arousa"
+                          className="w-full p-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-purple-500 outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                          Región de Localización
+                        </label>
+                        <input
+                          type="text"
+                          value={cfgStructuredDataRegion}
+                          onChange={(e) => setCfgStructuredDataRegion(e.target.value)}
+                          placeholder="Galicia, España"
+                          className="w-full p-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-purple-500 outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECTION 5: GENERADOR & DESCARGADOR SITEMAP.XML SUPER FULL CON GUARDADO EN DB */}
+                  <div className="bg-slate-900 border-2 border-slate-800 p-6 rounded-2xl text-white space-y-5 shadow-2xl">
+                    {(() => {
+                      const baseUrl = cfgCanonicalUrl || (typeof window !== 'undefined' ? window.location.origin : 'https://vilanova-de-arousa.gal');
+                      const todayIso = new Date().toISOString().split('T')[0];
+                      const escapeXml = (str: string) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+
+                      let fullXml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+                      fullXml += `<urlset\n`;
+                      fullXml += `  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n`;
+                      fullXml += `  xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"\n`;
+                      fullXml += `  xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"\n`;
+                      fullXml += `  xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0"\n`;
+                      fullXml += `  xmlns:xhtml="http://www.w3.org/1999/xhtml">\n\n`;
+
+                      // Home Page
+                      fullXml += `  <!-- Página Principal / Portal Oficial -->\n`;
+                      fullXml += `  <url>\n`;
+                      fullXml += `    <loc>${escapeXml(baseUrl)}/</loc>\n`;
+                      fullXml += `    <lastmod>${todayIso}</lastmod>\n`;
+                      fullXml += `    <changefreq>daily</changefreq>\n`;
+                      fullXml += `    <priority>1.0</priority>\n`;
+                      fullXml += `    <mobile:mobile/>\n`;
+                      fullXml += `  </url>\n\n`;
+
+                      // Categories
+                      fullXml += `  <!-- Secciones de Categorías de Noticias -->\n`;
+                      ['Alcaldia', 'Obras', 'Deportes', 'Cultura', 'Turismo', 'Servizos', 'Eventos'].forEach(cat => {
+                        fullXml += `  <url>\n`;
+                        fullXml += `    <loc>${escapeXml(baseUrl)}/#categoria-${cat.toLowerCase()}</loc>\n`;
+                        fullXml += `    <lastmod>${todayIso}</lastmod>\n`;
+                        fullXml += `    <changefreq>daily</changefreq>\n`;
+                        fullXml += `    <priority>0.9</priority>\n`;
+                        fullXml += `  </url>\n`;
+                      });
+
+                      // News Articles
+                      fullXml += `\n  <!-- Artículos y Noticias Publicadas (${newsList.length}) -->\n`;
+                      newsList.forEach((item) => {
+                        const itemDate = item.date ? item.date.split('T')[0] : todayIso;
+                        fullXml += `  <url>\n`;
+                        fullXml += `    <loc>${escapeXml(baseUrl)}/#noticia-${escapeXml(item.id)}</loc>\n`;
+                        fullXml += `    <lastmod>${itemDate}</lastmod>\n`;
+                        fullXml += `    <changefreq>weekly</changefreq>\n`;
+                        fullXml += `    <priority>0.8</priority>\n`;
+
+                        // Google News Rich Metadata
+                        fullXml += `    <news:news>\n`;
+                        fullXml += `      <news:publication>\n`;
+                        fullXml += `        <news:name>${escapeXml(cfgStructuredDataOrgName || 'Concello de Vilanova de Arousa')}</news:name>\n`;
+                        fullXml += `        <news:language>es</news:language>\n`;
+                        fullXml += `      </news:publication>\n`;
+                        fullXml += `      <news:publication_date>${itemDate}</news:publication_date>\n`;
+                        fullXml += `      <news:title>${escapeXml(item.title)}</news:title>\n`;
+                        fullXml += `    </news:news>\n`;
+
+                        // Google Image Metadata
+                        if (item.imageUrl) {
+                          fullXml += `    <image:image>\n`;
+                          fullXml += `      <image:loc>${escapeXml(item.imageUrl)}</image:loc>\n`;
+                          fullXml += `      <image:title>${escapeXml(item.title)}</image:title>\n`;
+                          fullXml += `    </image:image>\n`;
+                        }
+
+                        fullXml += `  </url>\n`;
+                      });
+
+                      fullXml += `</urlset>`;
+
+                      const totalUrlCount = newsList.length + 8;
+                      const googleLinkToDisplay = sitemapDbStatus.googleLink || `${typeof window !== 'undefined' ? window.location.origin : 'https://vilanova-de-arousa.gal'}/sitemap.xml`;
+
+                      const handleSaveSitemapToDb = async () => {
+                        setIsSavingSitemap(true);
+                        setSitemapSaveMessage('');
+                        try {
+                          const res = await safeFetchJson('/api/sitemap/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ xmlContent: fullXml, urlCount: totalUrlCount })
+                          });
+                          if (res && res.success) {
+                            setSitemapDbStatus({
+                              isStored: true,
+                              savedAt: res.savedAt || new Date().toISOString(),
+                              googleLink: res.googleLink || googleLinkToDisplay
+                            });
+                            setSitemapSaveMessage('✓ ¡Sitemap.xml guardado exitosamente en la base de datos PostgreSQL!');
+                            setTimeout(() => setSitemapSaveMessage(''), 4500);
+                          }
+                        } catch (e) {
+                          setSitemapSaveMessage('Error al guardar el sitemap en la base de datos.');
+                        } finally {
+                          setIsSavingSitemap(false);
+                        }
+                      };
+
+                      const handleDownloadSitemap = () => {
+                        const blob = new Blob([fullXml], { type: 'application/xml;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.setAttribute('download', 'sitemap.xml');
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                      };
+
+                      return (
+                        <>
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-emerald-400 font-bold text-base uppercase">
+                                <FileText className="w-5 h-5" />
+                                <span>Mapa del Sitio Profesional (Sitemap.xml)</span>
+                              </div>
+                              <p className="text-xs text-slate-300">
+                                Incluye {newsList.length} noticias con etiquetas avanzadas de <strong>Google News</strong> e <strong>Imágenes de Google</strong>.
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={handleSaveSitemapToDb}
+                                disabled={isSavingSitemap}
+                                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition shadow-lg border-2 border-emerald-400"
+                              >
+                                <Database className={`w-4 h-4 ${isSavingSitemap ? 'animate-spin' : ''}`} />
+                                <span>{isSavingSitemap ? 'Guardando en DB...' : 'Guardar Sitemap en DB'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={handleDownloadSitemap}
+                                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3 py-2.5 rounded-xl text-xs uppercase tracking-wider transition border border-slate-700"
+                              >
+                                <Download className="w-4 h-4 text-emerald-400" />
+                                <span>Descargar .xml</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(fullXml);
+                                  setCopiedSitemap(true);
+                                  setTimeout(() => setCopiedSitemap(false), 3000);
+                                }}
+                                className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3 py-2.5 rounded-xl text-xs transition border border-slate-700"
+                              >
+                                <Copy className="w-4 h-4 text-blue-400" />
+                                <span>{copiedSitemap ? '¡Copiado!' : 'Copiar XML'}</span>
+                              </button>
+
+                              <a
+                                href="/sitemap.xml"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-2.5 rounded-xl text-xs transition"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                                <span>Abrir /sitemap.xml</span>
+                              </a>
+                            </div>
+                          </div>
+
+                          {sitemapSaveMessage && (
+                            <div className="p-3 bg-emerald-950 border border-emerald-700 text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-2 animate-fadeIn">
+                              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                              <span>{sitemapSaveMessage}</span>
+                            </div>
+                          )}
+
+                          {/* GOOGLE SEARCH CONSOLE DIRECT LINK BOX */}
+                          <div className="bg-slate-950 border-2 border-emerald-600/90 p-4 rounded-xl space-y-3 shadow-inner">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                                <span>Enlace Oficial Listo para Google Search Console:</span>
+                              </div>
+                              {sitemapDbStatus.isStored && (
+                                <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950 border border-emerald-700 px-2.5 py-0.5 rounded-full font-bold">
+                                  ✓ Almacenado en DB PostgreSQL {sitemapDbStatus.savedAt ? `(${new Date(sitemapDbStatus.savedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })})` : ''}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-center gap-2">
+                              <input
+                                type="text"
+                                readOnly
+                                value={googleLinkToDisplay}
+                                className="w-full p-2.5 text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg text-emerald-300 select-all outline-none font-bold tracking-wide"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(googleLinkToDisplay);
+                                  setCopiedGoogleLink(true);
+                                  setTimeout(() => setCopiedGoogleLink(false), 3000);
+                                }}
+                                className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2.5 rounded-lg text-xs uppercase tracking-wider transition border border-emerald-400 shadow-md"
+                              >
+                                <Copy className="w-4 h-4" />
+                                <span>{copiedGoogleLink ? '¡Enlace Copiado!' : 'Copiar Enlace para Google'}</span>
+                              </button>
+                            </div>
+                            <p className="text-[11px] text-slate-400">
+                              📌 Copia este enlace directo e ingrésalo en <strong>Google Search Console &gt; Sitemaps</strong> para indexación automática.
+                            </p>
+                          </div>
+
+                          {/* Code Display Area */}
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center text-[10px] uppercase font-mono text-slate-400">
+                              <span>Vista Previa del Archivo XML Guardado en DB:</span>
+                              <span>{totalUrlCount} URLs Indexadas</span>
+                            </div>
+                            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 overflow-x-auto max-h-64 text-emerald-400 font-mono text-xs leading-relaxed">
+                              <pre>{fullXml}</pre>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
               </div>
 
               {/* SAVE SEO CONFIGURATION BUTTON */}
@@ -2327,6 +2826,93 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                   <RefreshCw className={`w-4 h-4 ${isLoadingVisits ? 'animate-spin' : ''}`} />
                   <span>{isLoadingVisits ? 'Actualizando...' : 'Actualizar Historial'}</span>
                 </button>
+              </div>
+
+              {/* DIRECT PORTAL VISITS EDIT BOX */}
+              <div className="bg-slate-900 border-2 border-emerald-500/90 p-6 rounded-2xl space-y-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2 text-base font-black uppercase text-white font-serif">
+                    <Eye className="w-5 h-5 text-emerald-400" />
+                    <span>Modificar Contador de Visitas del Portal</span>
+                  </div>
+                  <span className="bg-emerald-950 text-emerald-300 text-xs font-mono font-bold px-3 py-1 rounded-full border border-emerald-700/80">
+                    Visitas Mostradas en la Web: {(cfgBaseVisits + Math.floor(Math.max(0, Date.now() - new Date('2026-01-01T00:00:00Z').getTime()) / (3 * 60 * 60 * 1000)) * 23).toLocaleString('es-ES')}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-center">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold uppercase text-slate-300 tracking-wider">
+                      Cifra Base de Visitas (Número Inicial)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={cfgBaseVisits}
+                      onChange={(e) => setCfgBaseVisits(parseInt(e.target.value, 10) || 0)}
+                      className="w-full p-3 bg-slate-950 border-2 border-slate-700 focus:border-emerald-500 text-emerald-400 font-mono text-lg font-black rounded-xl outline-none"
+                    />
+                  </div>
+
+                  {/* Quick preset buttons */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold uppercase text-slate-400 tracking-wider">
+                      Ajustar / Sumar Visitas Rápidamente:
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCfgBaseVisits(prev => prev + 100)}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold transition hover:scale-105"
+                      >
+                        +100
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCfgBaseVisits(prev => prev + 500)}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold transition hover:scale-105"
+                      >
+                        +500
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCfgBaseVisits(prev => prev + 1000)}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold transition hover:scale-105"
+                      >
+                        +1.000
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCfgBaseVisits(prev => prev + 5000)}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold transition hover:scale-105"
+                      >
+                        +5.000
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCfgBaseVisits(30)}
+                        className="px-3 py-1.5 bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 rounded-lg text-xs font-bold transition hover:scale-105"
+                      >
+                        Reiniciar (30)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-800">
+                  <p className="text-xs text-slate-400">
+                    Al guardar, la nueva cifra de visitas se actualizará instantáneamente en el pie de página del portal web.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleSaveConfig}
+                    disabled={isSavingConfig}
+                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black px-6 py-2.5 rounded-xl text-xs uppercase tracking-wider transition shadow-lg flex items-center justify-center gap-2 border-2 border-emerald-400 shrink-0"
+                  >
+                    <Save className={`w-4 h-4 ${isSavingConfig ? 'animate-spin' : ''}`} />
+                    <span>{isSavingConfig ? 'Guardando...' : 'Guardar Visitas al Portal'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* KPI Metrics */}

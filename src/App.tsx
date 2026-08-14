@@ -8,14 +8,13 @@ import { AdminPanel } from './components/AdminPanel';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { Footer } from './components/Footer';
 import { FeaturedVideo } from './components/FeaturedVideo';
-import { NewsItem, Category, SiteConfig, defaultSiteConfig } from './types';
+import { NewsItem, SiteConfig, defaultSiteConfig } from './types';
 import { initialNewsData } from './data/newsData';
 import { safeFetchJson } from './utils/apiHelper';
 
 export default function App() {
   const [newsList, setNewsList] = useState<NewsItem[]>([]);
   const [siteConfig, setSiteConfig] = useState<SiteConfig>(defaultSiteConfig);
-  const [currentCategory, setCurrentCategory] = useState<Category>('Todas');
   const [searchQuery, setSearchQuery] = useState('');
   const [savedNewsIds, setSavedNewsIds] = useState<string[]>([]);
   const [isSavedView, setIsSavedView] = useState(false);
@@ -346,8 +345,6 @@ export default function App() {
     // Filter by bookmarks if in saved view
     if (isSavedView) {
       result = result.filter((n) => savedNewsIds.includes(n.id));
-    } else if (currentCategory !== 'Todas') {
-      result = result.filter((n) => n.category === currentCategory);
     }
 
     // Search filter
@@ -365,20 +362,20 @@ export default function App() {
     }
 
     return result;
-  }, [newsList, currentCategory, searchQuery, isSavedView, savedNewsIds]);
+  }, [newsList, searchQuery, isSavedView, savedNewsIds]);
 
   // Breaking news items
   const breakingNews = useMemo(() => {
     return newsList.filter((n) => n.isBreaking);
   }, [newsList]);
 
-  // Hero news (Position #1 or first item if category filtered)
+  // Hero news (Position #1 or top item)
   const heroNewsItem = useMemo(() => {
-    if (isSavedView || searchQuery.trim() || currentCategory !== 'Todas') {
+    if (isSavedView || searchQuery.trim()) {
       return null;
     }
     return filteredNews.length > 0 ? filteredNews[0] : null;
-  }, [filteredNews, isSavedView, searchQuery, currentCategory]);
+  }, [filteredNews, isSavedView, searchQuery]);
 
   // Grid news items (excluding hero if present)
   const gridNewsItems = useMemo(() => {
@@ -393,11 +390,6 @@ export default function App() {
       <div>
         {/* Main Header */}
         <Header
-          currentCategory={currentCategory}
-          onSelectCategory={(cat) => {
-            setCurrentCategory(cat);
-            setIsSavedView(false);
-          }}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onOpenAdmin={() => setIsAuthModalOpen(true)}
@@ -433,7 +425,7 @@ export default function App() {
             </section>
           )}
 
-          {/* Grid Stream of Articles (4-column row directly matching screenshot) */}
+          {/* Grid Stream of All Articles */}
           {gridNewsItems.length > 0 ? (
             <section className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
@@ -452,14 +444,13 @@ export default function App() {
           ) : (
             <div className="text-center py-16 bg-[#fdfcf8] dark:bg-black border-4 border-black dark:border-white p-8 space-y-4 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,1)]">
               <p className="text-lg font-black uppercase font-display text-black dark:text-white">
-                No se encontraron noticias en esta sección.
+                No se encontraron noticias con los criterios de búsqueda actuales.
               </p>
               <p className="text-xs font-mono text-slate-700 dark:text-slate-300 max-w-md mx-auto uppercase">
-                Prueba seleccionando otra categoría o utiliza el Panel de Administración para crear una nueva noticia.
+                Prueba borrando el término de búsqueda para ver todas las noticias de la página principal.
               </p>
               <button
                 onClick={() => {
-                  setCurrentCategory('Todas');
                   setIsSavedView(false);
                   setSearchQuery('');
                 }}
@@ -508,10 +499,7 @@ export default function App() {
 
       {/* Footer */}
       <Footer
-        onSelectCategory={(cat) => {
-          setCurrentCategory(cat);
-          setIsSavedView(false);
-        }}
+        siteConfig={siteConfig}
         onOpenAdmin={() => setIsAuthModalOpen(true)}
         onSaveToCodeDirectly={handleSaveToCodeDirectly}
       />

@@ -62,6 +62,7 @@ export interface SiteConfig {
   logoSize: number; // Logo size in pixels (e.g. 48)
   titleColor: string; // Header title color hex (e.g. #c20000)
   titleText?: string; // Custom title text (default: Concello de Vilanova de Arousa)
+  baseVisits?: number; // Base number of portal visits shown on website
   // Video Configuration
   videoUrl: string; // YouTube video URL or ID
   videoTitle: string; // Video title text
@@ -89,6 +90,7 @@ export const defaultSiteConfig: SiteConfig = {
   logoSize: 48,
   titleColor: '#c20000',
   titleText: 'Concello de Vilanova de Arousa',
+  baseVisits: 30,
   videoUrl: 'https://www.youtube.com/watch?v=40GxTki9Krc',
   videoTitle: 'Información y Proyectos Municipales en Vilanova de Arousa',
   videoBadge: 'NOTICIA IMPORTANTE',

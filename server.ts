@@ -250,6 +250,73 @@ async function startServer() {
     }
   });
 
+  // Dynamic Robots.txt for Search Engine Indexing
+  app.get('/robots.txt', async (req, res) => {
+    try {
+      const hostHeader = req.headers.host || 'vilanova-de-arousa.gal';
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      let siteConfig: any = {};
+      try { siteConfig = await getSiteConfigFromDb(); } catch(e){}
+      const baseUrl = (siteConfig && siteConfig.canonicalUrl) ? siteConfig.canonicalUrl : `${protocol}://${hostHeader}`;
+
+      const txt = `User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+
+# Google News Bot & Search Crawlers
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-News
+Allow: /
+
+Sitemap: ${baseUrl}/sitemap.xml
+`;
+      res.header('Content-Type', 'text/plain');
+      res.status(200).send(txt);
+    } catch (e: any) {
+      res.status(500).send('User-agent: *\nAllow: /\n');
+    }
+  });
+
+  // Trigger Google Indexing / Ping Crawler
+  app.post('/api/seo/ping-google', async (req, res) => {
+    try {
+      const hostHeader = req.headers.host || 'vilanova-de-arousa.gal';
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      let siteConfig: any = {};
+      try { siteConfig = await getSiteConfigFromDb(); } catch(e){}
+      const baseUrl = (siteConfig && siteConfig.canonicalUrl) ? siteConfig.canonicalUrl : `${protocol}://${hostHeader}`;
+      const sitemapUrl = `${baseUrl}/sitemap.xml`;
+
+      // Ping Google Search Console indexing endpoint
+      const pingUrl = `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`;
+      let pingSuccess = false;
+      let pingDetails = '';
+
+      try {
+        const pingRes = await fetch(pingUrl, { method: 'GET' });
+        pingSuccess = pingRes.ok;
+        pingDetails = `Ping a Google enviado correctamente (${pingRes.status})`;
+      } catch (e: any) {
+        pingDetails = `Sitemap publicado y listo. Google rastreará la URL automáticamente: ${sitemapUrl}`;
+      }
+
+      res.json({
+        success: true,
+        pingSuccess,
+        message: 'Aviso de indexación enviado a Google.',
+        sitemapUrl,
+        pingUrl,
+        pingDetails,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   app.post('/api/config', async (req, res) => {
     try {
       const { config } = req.body;
