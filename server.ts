@@ -109,12 +109,13 @@ async function startServer() {
   });
 
   // Dynamic Sitemap.xml route for Google Search Console indexing
-  app.get('/sitemap.xml', async (req, res) => {
+  const handleSitemap = async (req: express.Request, res: express.Response) => {
     try {
       // 1. First check if stored in DB
       const stored = await getSitemapXmlFromDb();
       if (stored && stored.xmlContent) {
-        res.header('Content-Type', 'application/xml');
+        res.header('Content-Type', 'application/xml; charset=utf-8');
+        res.header('Cache-Control', 'public, max-age=3600');
         return res.status(200).send(stored.xmlContent);
       }
 
@@ -194,17 +195,22 @@ async function startServer() {
 
       xml += `</urlset>`;
 
-      // Save generated sitemap to DB
+      // Save generated sitemap to DB and disk
       try {
         await saveSitemapXmlToDb(xml, news.length + 8);
       } catch (e) {}
 
-      res.header('Content-Type', 'application/xml');
+      res.header('Content-Type', 'application/xml; charset=utf-8');
+      res.header('Cache-Control', 'public, max-age=3600');
       res.status(200).send(xml);
     } catch (err: any) {
       res.status(500).send('Error generating sitemap');
     }
-  });
+  };
+
+  app.get('/sitemap.xml', handleSitemap);
+  app.get('/api/sitemap.xml', handleSitemap);
+  app.get('/api/sitemap', handleSitemap);
 
   // Save Sitemap XML to PostgreSQL
   app.post('/api/sitemap/save', async (req, res) => {

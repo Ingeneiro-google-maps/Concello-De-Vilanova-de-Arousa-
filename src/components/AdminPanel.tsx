@@ -2628,7 +2628,9 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                       fullXml += `</urlset>`;
 
                       const totalUrlCount = newsList.length + 8;
-                      const googleLinkToDisplay = sitemapDbStatus.googleLink || `${typeof window !== 'undefined' ? window.location.origin : 'https://vilanova-de-arousa.gal'}/sitemap.xml`;
+                      const currentOriginUrl = typeof window !== 'undefined' ? `${window.location.origin}/sitemap.xml` : 'https://vilanova-de-arousa.gal/sitemap.xml';
+                      const productionCanonicalUrl = `${cfgCanonicalUrl ? cfgCanonicalUrl.replace(/\/$/, '') : (typeof window !== 'undefined' ? window.location.origin : 'https://vilanova-de-arousa.gal')}/sitemap.xml`;
+                      const googleLinkToDisplay = sitemapDbStatus.googleLink || productionCanonicalUrl;
 
                       const handleSaveSitemapToDb = async () => {
                         setIsSavingSitemap(true);
@@ -2645,8 +2647,8 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                               savedAt: res.savedAt || new Date().toISOString(),
                               googleLink: res.googleLink || googleLinkToDisplay
                             });
-                            setSitemapSaveMessage('✓ ¡Sitemap.xml guardado exitosamente en la base de datos PostgreSQL!');
-                            setTimeout(() => setSitemapSaveMessage(''), 4500);
+                            setSitemapSaveMessage('✓ ¡Sitemap.xml guardado exitosamente en PostgreSQL y generado como archivo físico!');
+                            setTimeout(() => setSitemapSaveMessage(''), 5000);
                           }
                         } catch (e) {
                           setSitemapSaveMessage('Error al guardar el sitemap en la base de datos.');
@@ -2716,7 +2718,7 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                                 href="/sitemap.xml"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-2.5 rounded-xl text-xs transition"
+                                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold px-3.5 py-2.5 rounded-xl text-xs transition shadow border border-blue-400"
                               >
                                 <ExternalLink className="w-4 h-4" />
                                 <span>Abrir /sitemap.xml</span>
@@ -2736,7 +2738,7 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                               <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
                                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                                <span>Enlace Oficial Listo para Google Search Console:</span>
+                                <span>Enlace Oficial para Google Search Console &amp; Navegadores:</span>
                               </div>
                               {sitemapDbStatus.isStored && (
                                 <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950 border border-emerald-700 px-2.5 py-0.5 rounded-full font-bold">
@@ -2745,28 +2747,70 @@ export const initialNews: NewsItem[] = ${JSON.stringify(newsList, null, 2)};
                               )}
                             </div>
 
-                            <div className="flex flex-col sm:flex-row items-center gap-2">
-                              <input
-                                type="text"
-                                readOnly
-                                value={googleLinkToDisplay}
-                                className="w-full p-2.5 text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg text-emerald-300 select-all outline-none font-bold tracking-wide"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText(googleLinkToDisplay);
-                                  setCopiedGoogleLink(true);
-                                  setTimeout(() => setCopiedGoogleLink(false), 3000);
-                                }}
-                                className="w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black px-4 py-2.5 rounded-lg text-xs uppercase tracking-wider transition border border-emerald-400 shadow-md"
-                              >
-                                <Copy className="w-4 h-4" />
-                                <span>{copiedGoogleLink ? '¡Enlace Copiado!' : 'Copiar Enlace para Google'}</span>
-                              </button>
+                            <div className="grid grid-cols-1 gap-2">
+                              {/* 1. Actual Live Working App URL */}
+                              <div className="space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-slate-400 flex items-center justify-between">
+                                  <span>1. Enlace Directo Activo (Servidor Actual):</span>
+                                  <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline flex items-center gap-1 font-mono lowercase">
+                                    <span>probar en vivo</span>
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    value={currentOriginUrl}
+                                    className="w-full p-2.5 text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg text-emerald-300 select-all outline-none font-bold"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(currentOriginUrl);
+                                      setCopiedGoogleLink(true);
+                                      setTimeout(() => setCopiedGoogleLink(false), 3000);
+                                    }}
+                                    className="shrink-0 flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3 py-2.5 rounded-lg text-xs transition border border-slate-700"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" />
+                                    <span>Copiar</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* 2. Canonical Production Domain URL */}
+                              {cfgCanonicalUrl && cfgCanonicalUrl !== (typeof window !== 'undefined' ? window.location.origin : '') && (
+                                <div className="space-y-1 pt-1">
+                                  <label className="text-[10px] uppercase font-bold text-slate-400">
+                                    2. Enlace con Dominio Canónico Personalizado:
+                                  </label>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      readOnly
+                                      value={productionCanonicalUrl}
+                                      className="w-full p-2.5 text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg text-cyan-300 select-all outline-none font-bold"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(productionCanonicalUrl);
+                                        setCopiedGoogleLink(true);
+                                        setTimeout(() => setCopiedGoogleLink(false), 3000);
+                                      }}
+                                      className="shrink-0 flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3 py-2.5 rounded-lg text-xs transition border border-slate-700"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                      <span>Copiar</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <p className="text-[11px] text-slate-400">
-                              📌 Copia este enlace directo e ingrésalo en <strong>Google Search Console &gt; Sitemaps</strong> para indexación automática.
+
+                            <p className="text-[11px] text-slate-400 pt-1">
+                              📌 Copia cualquiera de estos enlaces e ingrésalo en <strong>Google Search Console &gt; Sitemaps</strong> para indexar todas tus noticias automáticamente.
                             </p>
                           </div>
 

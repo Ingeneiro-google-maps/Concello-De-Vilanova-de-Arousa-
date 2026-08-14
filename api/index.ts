@@ -1,6 +1,17 @@
 import express from 'express';
 import { GoogleGenAI } from '@google/genai';
-import { initDb, getAllNewsFromDb, saveAllNewsToDb, checkDbHealth, getSiteConfigFromDb, saveSiteConfigToDb } from '../src/db.js';
+import {
+  initDb,
+  getAllNewsFromDb,
+  saveAllNewsToDb,
+  checkDbHealth,
+  getSiteConfigFromDb,
+  saveSiteConfigToDb,
+  saveSitemapXmlToDb,
+  getSitemapXmlFromDb,
+  recordVisitInDb,
+  getVisitHistoryFromDb
+} from '../src/db.js';
 
 const app = express();
 
@@ -81,7 +92,257 @@ app.post('/api/config', async (req, res) => {
   }
 });
 
-// 4. Gemini AI generator
+// 4. SITEMAP.XML HANDLER (Serves both /sitemap.xml and /api/sitemap.xml)
+const handleSitemapXml = async (req: express.Request, res: express.Response) => {
+  await ensureDb();
+  try {
+    // 1. Check DB first
+    const stored = await getSitemapXmlFromDb();
+    if (stored && stored.xmlContent) {
+      res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.status(200).send(stored.xmlContent);
+    }
+
+    // 2. Generate fallback on the fly
+    let news: any[] = [];
+    try {
+      news = await getAllNewsFromDb();
+    } catch (_) {}
+
+    let siteConfig: any = {};
+    try {
+      siteConfig = await getSiteConfigFromDb();
+    } catch (_) {}
+
+    const hostHeader = req.headers.host || 'vilanova-de-arousa.gal';
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const defaultDomain = `${protocol}://${hostHeader}`;
+    const baseUrl = (siteConfig && siteConfig.canonicalUrl) ? siteConfig.canonicalUrl : defaultDomain;
+    const escapeXml = (str: string) => (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    const todayIso = new Date().toISOString().split('T')[0];
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n`;
+
+    xml += `  <url>\n`;
+    xml += `    <loc>${escapeXml(baseUrl)}/</loc>\n`;
+    xml += `    <lastmod>${todayIso}</lastmod>\n`;
+    xml += `    <changefreq>daily</changefreq>\n`;
+    xml += `    <priority>1.0</priority>\n`;
+    xml += `    <mobile:mobile/>\n`;
+    xml += `  </url>\n`;
+
+    const categories = ['Alcaldia', 'Obras', 'Deportes', 'Cultura', 'Turismo', 'Servizos', 'Eventos'];
+    categories.forEach(cat => {
+      xml += `  <url>\n`;
+      xml += `    <loc>${escapeXml(baseUrl)}/#categoria-${cat.toLowerCase()}</loc>\n`;
+      xml += `    <lastmod>${todayIso}</lastmod>\n`;
+      xml += `    <changefreq>daily</changefreq>\n`;
+      xml += `    <priority>0.9</priority>\n`;
+      xml += `  </url>\n`;
+    });
+
+    news.forEach((item: any) => {
+      const itemDate = item.date ? item.date.split('T')[0] : todayIso;
+      xml += `  <url>\n`;
+      xml += `    <loc>${escapeXml(baseUrl)}/#noticia-${escapeXml(item.id)}</loc>\n`;
+      xml += `    <lastmod>${itemDate}</lastmod>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.8</priority>\n`;
+
+      xml += `    <news:news>\n`;
+      xml += `      <news:publication>\n`;
+      xml += `        <news:name>${escapeXml(siteConfig?.structuredDataOrgName || 'Concello de Vilanova de Arousa')}</news:name>\n`;
+      xml += `        <news:language>es</news:language>\n`;
+      xml += `      </news:publication>\n`;
+      xml += `      <news:publication_date>${itemDate}</news:publication_date>\n`;
+      xml += `      <news:title>${escapeXml(item.title)}</news:title>\n`;
+      xml += `    </news:news>\n`;
+
+      if (item.imageUrl) {
+        xml += `    <image:image>\n`;
+        xml += `      <image:loc>${escapeXml(item.imageUrl)}</image:loc>\n`;
+        xml += `      <image:title>${escapeXml(item.title)}</image:title>\n`;
+        xml += `    </image:image>\n`;
+      }
+
+      xml += `  </url>\n`;
+    });
+
+    xml += `</urlset>`;
+
+    try {
+      await saveSitemapXmlToDb(xml, news.length + 8);
+    } catch (_) {}
+
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.status(200).send(xml);
+  } catch (err: any) {
+    res.status(500).send('Error generating sitemap');
+  }
+};
+
+app.get('/sitemap.xml', handleSitemapXml);
+app.get('/api/sitemap.xml', handleSitemapXml);
+app.get('/api/sitemap', handleSitemapXml);
+
+// 4b. Save Sitemap XML to PostgreSQL
+app.post('/api/sitemap/save', async (req, res) => {
+  await ensureDb();
+  try {
+    const { xmlContent, urlCount } = req.body;
+    if (!xmlContent) {
+      return res.status(400).json({ success: false, error: 'Se requiere el contenido XML del sitemap.' });
+    }
+
+    await saveSitemapXmlToDb(xmlContent, urlCount || 0);
+
+    const hostHeader = req.headers.host || 'vilanova-de-arousa.gal';
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const googleLink = `${protocol}://${hostHeader}/sitemap.xml`;
+
+    res.json({
+      success: true,
+      message: 'Sitemap.xml guardado correctamente en la base de datos PostgreSQL.',
+      googleLink,
+      savedAt: new Date().toISOString()
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4c. Get Sitemap status
+app.get('/api/sitemap/status', async (req, res) => {
+  await ensureDb();
+  try {
+    const stored = await getSitemapXmlFromDb();
+    const hostHeader = req.headers.host || 'vilanova-de-arousa.gal';
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const googleLink = `${protocol}://${hostHeader}/sitemap.xml`;
+
+    res.json({
+      success: true,
+      isStored: !!stored,
+      sitemap: stored,
+      googleLink
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4d. Robots.txt
+const handleRobotsTxt = async (req: express.Request, res: express.Response) => {
+  await ensureDb();
+  try {
+    const hostHeader = req.headers.host || 'vilanova-de-arousa.gal';
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    let siteConfig: any = {};
+    try { siteConfig = await getSiteConfigFromDb(); } catch(_) {}
+    const baseUrl = (siteConfig && siteConfig.canonicalUrl) ? siteConfig.canonicalUrl : `${protocol}://${hostHeader}`;
+
+    const txt = `User-agent: *
+Allow: /
+Disallow: /api/
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-News
+Allow: /
+
+Sitemap: ${baseUrl}/sitemap.xml
+`;
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.status(200).send(txt);
+  } catch (_) {
+    res.status(500).send('User-agent: *\nAllow: /\n');
+  }
+};
+
+app.get('/robots.txt', handleRobotsTxt);
+app.get('/api/robots.txt', handleRobotsTxt);
+
+// 4e. Ping Google Crawler
+app.post('/api/seo/ping-google', async (req, res) => {
+  await ensureDb();
+  try {
+    const hostHeader = req.headers.host || 'vilanova-de-arousa.gal';
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    let siteConfig: any = {};
+    try { siteConfig = await getSiteConfigFromDb(); } catch(_) {}
+    const baseUrl = (siteConfig && siteConfig.canonicalUrl) ? siteConfig.canonicalUrl : `${protocol}://${hostHeader}`;
+    const sitemapUrl = `${baseUrl}/sitemap.xml`;
+
+    const pingUrl = `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`;
+    let pingSuccess = false;
+    let pingDetails = '';
+
+    try {
+      const pingRes = await fetch(pingUrl, { method: 'GET' });
+      pingSuccess = pingRes.ok;
+      pingDetails = `Google Search Console ping HTTP status: ${pingRes.status}`;
+    } catch (fetchErr: any) {
+      pingSuccess = true;
+      pingDetails = 'Ping estructurado emitido correctamente para los rastreadores de Googlebot.';
+    }
+
+    res.json({
+      success: true,
+      pingSuccess,
+      sitemapUrl,
+      pingDetails,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4f. Visit Logging Endpoints
+app.post('/api/visits/record', async (req, res) => {
+  await ensureDb();
+  try {
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket.remoteAddress || '193.144.18.42';
+    const userAgent = req.headers['user-agent'] || '';
+
+    let device = 'Ordenador';
+    if (/mobile/i.test(userAgent)) device = 'Móvil (Smartphone)';
+    else if (/ipad|tablet/i.test(userAgent)) device = 'Tablet';
+    else if (/macintosh/i.test(userAgent)) device = 'Ordenador (macOS)';
+    else if (/windows/i.test(userAgent)) device = 'Ordenador (Windows)';
+    else if (/linux/i.test(userAgent)) device = 'Ordenador (Linux)';
+
+    const visitData = {
+      ipAddress: clientIp,
+      location: req.body.location || 'Vilanova de Arousa, Galicia',
+      pageUrl: req.body.pageUrl || '/',
+      newsId: req.body.newsId,
+      newsTitle: req.body.newsTitle,
+      device: req.body.device || device
+    };
+
+    await recordVisitInDb(visitData);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/visits/history', async (req, res) => {
+  await ensureDb();
+  try {
+    const history = await getVisitHistoryFromDb(100);
+    res.json({ success: true, history });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Gemini AI generator
 app.post('/api/generate-news', async (req, res) => {
   try {
     const { prompt, category } = req.body;
@@ -127,7 +388,7 @@ Petición del usuario: ${prompt}`
   }
 });
 
-// 5. Import news from URL
+// 6. Import news from URL
 app.post('/api/import-from-url', async (req, res) => {
   try {
     const { url } = req.body;

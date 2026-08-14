@@ -2,8 +2,20 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/api/index.ts"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/index.ts"
+    },
+    {
+      "source": "/((?!api/|sitemap\\.xml|robots\\.txt|.*\\..*).*)",
+      "destination": "/index.html"
     }
   ]
 }

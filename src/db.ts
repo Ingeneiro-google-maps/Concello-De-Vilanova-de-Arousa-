@@ -506,9 +506,31 @@ export async function saveSitemapXmlToDb(xmlContent: string, urlCount: number = 
         url_count = EXCLUDED.url_count,
         updated_at = CURRENT_TIMESTAMP
     `, [xmlContent, urlCount]);
+
+    // Also persist directly to physical public and dist files for static web servers / Vercel
+    try {
+      const publicPath = path.join(process.cwd(), 'public', 'sitemap.xml');
+      await fs.mkdir(path.dirname(publicPath), { recursive: true });
+      await fs.writeFile(publicPath, xmlContent, 'utf-8');
+
+      const distPath = path.join(process.cwd(), 'dist', 'sitemap.xml');
+      try {
+        await fs.mkdir(path.dirname(distPath), { recursive: true });
+        await fs.writeFile(distPath, xmlContent, 'utf-8');
+      } catch (_) {}
+    } catch (fsErr) {
+      console.warn('Could not write sitemap.xml to disk:', fsErr);
+    }
+
     return true;
   } catch (err) {
     console.error('Error saving sitemap.xml to DB:', err);
+    // Even if DB fails, try writing to disk
+    try {
+      const publicPath = path.join(process.cwd(), 'public', 'sitemap.xml');
+      await fs.mkdir(path.dirname(publicPath), { recursive: true });
+      await fs.writeFile(publicPath, xmlContent, 'utf-8');
+    } catch (_) {}
     throw err;
   }
 }
@@ -524,11 +546,24 @@ export async function getSitemapXmlFromDb(): Promise<{ xmlContent: string; updat
         updatedAt: res.rows[0].updated_at ? new Date(res.rows[0].updated_at).toISOString() : new Date().toISOString()
       };
     }
-    return null;
   } catch (err) {
     console.warn('Error reading sitemap.xml from DB:', err);
-    return null;
   }
+
+  // Fallback to disk file if DB is empty or unreachable
+  try {
+    const publicPath = path.join(process.cwd(), 'public', 'sitemap.xml');
+    const diskContent = await fs.readFile(publicPath, 'utf-8');
+    if (diskContent && diskContent.includes('<urlset')) {
+      return {
+        xmlContent: diskContent,
+        urlCount: (diskContent.match(/<url>/g) || []).length,
+        updatedAt: new Date().toISOString()
+      };
+    }
+  } catch (_) {}
+
+  return null;
 }
 
 
